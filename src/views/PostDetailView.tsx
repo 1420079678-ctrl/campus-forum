@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import {
   ArrowLeft, Bookmark, CornerDownRight, Eye, Flag, Hash, Heart, MessageCircle,
-  PenLine, SendHorizontal, ShieldAlert, Star, Trash2,
+  PenLine, SendHorizontal, ShieldAlert, SmilePlus, Star, Trash2, X,
 } from 'lucide-react'
 import { api } from '../api'
 import { timeAgo } from '../format'
 import Composer from '../components/Composer'
+import StickerPicker, { CommentBody, StickerCard } from '../components/StickerPicker'
+import { commentPreview, stickerToken, type StickerId } from '../stickers'
 import type { Board, CommentItem, Me, Post } from '../types'
 import { RISK_LABEL } from '../types'
 
@@ -30,6 +32,8 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
   const [replyTo, setReplyTo] = useState<CommentItem | null>(null)
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [selectedSticker, setSelectedSticker] = useState<StickerId | null>(null)
 
   const canModerate = user && (user.role === 'moderator' || user.role === 'admin')
 
@@ -107,16 +111,19 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
   }
 
   const submitComment = async () => {
-    if (!requireAuth() || !post || body.trim().length === 0 || busy) return
+    const content = selectedSticker ? stickerToken(selectedSticker) : body
+    if (!requireAuth() || !post || content.trim().length === 0 || busy) return
     setBusy(true)
     try {
       const payload = await api<{ data: CommentItem }>(`/api/posts/${post.id}/comments`, {
         method: 'POST',
-        body: { body, parentId: replyTo?.id, anonymous },
+        body: { body: content, parentId: replyTo?.id, anonymous },
       })
       setComments((items) => [...items, payload.data])
       setPost((current) => current ? { ...current, commentCount: current.commentCount + 1 } : current)
       setBody('')
+      setSelectedSticker(null)
+      setPickerOpen(false)
       setReplyTo(null)
       notify('评论已发布')
     } catch (err) {
@@ -226,12 +233,12 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
                 {comment.replyTo && <span className="reply-to">回复 {comment.replyTo}</span>}
                 <small>{timeAgo(comment.createdAt)}</small>
               </div>
-              <p>{comment.body}</p>
+              <CommentBody body={comment.body} />
               <div className="comment-actions">
                 <button className={comment.liked ? 'engaged' : ''} onClick={() => toggleCommentLike(comment)}>
                   <Heart size={14} fill={comment.liked ? 'currentColor' : 'none'} />{comment.likeCount > 0 ? comment.likeCount : '赞'}
                 </button>
-                <button onClick={() => { if (requireAuth()) { setReplyTo(comment); document.getElementById('comment-input')?.focus() } }}><MessageCircle size={14} />回复</button>
+                <button onClick={() => { if (requireAuth()) { setReplyTo(comment); setSelectedSticker(null); document.getElementById('comment-input')?.focus() } }}><MessageCircle size={14} />回复</button>
                 {comment.isOwn && <button onClick={() => deleteComment(comment)}><Trash2 size={13} />删除</button>}
                 {!comment.isOwn && <button onClick={() => requireAuth() && onReportComment(comment)}><Flag size={13} />举报</button>}
               </div>
@@ -243,7 +250,7 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
       <div className="comment-composer">
         {replyTo && (
           <div className="replying-chip">
-            <CornerDownRight size={13} />回复 {replyTo.author.nickname}：{replyTo.body.slice(0, 24)}…
+            <CornerDownRight size={13} />回复 {replyTo.author.nickname}：{commentPreview(replyTo.body).slice(0, 24)}…
             <button onClick={() => setReplyTo(null)}>取消</button>
           </div>
         )}
@@ -255,20 +262,37 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
                 id="comment-input"
                 value={body}
                 maxLength={1000}
-                onChange={(event) => setBody(event.target.value)}
+                onChange={(event) => { setBody(event.target.value); setSelectedSticker(null) }}
                 placeholder={post.status === 'visible' ? '友善的回复是社区最好的礼物…' : '帖子审核通过后才能回复'}
                 disabled={post.status !== 'visible'}
                 rows={3}
               />
             </div>
+            {selectedSticker && (
+              <div className="sticker-draft">
+                <StickerCard id={selectedSticker} />
+                <div><strong>准备发送这个表情包</strong><span>也可以换一个，或继续输入文字。</span></div>
+                <button onClick={() => setSelectedSticker(null)} aria-label="移除表情包"><X size={15} /></button>
+              </div>
+            )}
+            {pickerOpen && (
+              <StickerPicker
+                onClose={() => setPickerOpen(false)}
+                onEmoji={(emoji) => { setSelectedSticker(null); setBody((value) => value + emoji); document.getElementById('comment-input')?.focus() }}
+                onSticker={(sticker) => { setSelectedSticker(sticker); setBody(''); setPickerOpen(false) }}
+              />
+            )}
             <div className="comment-submit-row">
-              <label className="toggle-row small">
-                <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} />
-                <span className="toggle-track"><span className="toggle-thumb" /></span>
-                <span className="toggle-label">匿名回复</span>
-              </label>
-              <button className="primary-button" disabled={body.trim().length === 0 || busy || post.status !== 'visible'} onClick={submitComment}>
-                <SendHorizontal size={15} />{busy ? '发布中…' : replyTo ? '发布回复' : '发布评论'}
+              <div className="comment-tools">
+                <button className={pickerOpen ? 'active' : ''} onClick={() => setPickerOpen((value) => !value)} aria-expanded={pickerOpen}><SmilePlus size={16} />表情 / 表情包</button>
+                <label className="toggle-row small">
+                  <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} />
+                  <span className="toggle-track"><span className="toggle-thumb" /></span>
+                  <span className="toggle-label">匿名</span>
+                </label>
+              </div>
+              <button className="primary-button comment-send" disabled={(!selectedSticker && body.trim().length === 0) || busy || post.status !== 'visible'} onClick={submitComment}>
+                <SendHorizontal size={15} />{busy ? '发布中…' : selectedSticker ? '发送表情包' : replyTo ? '发布回复' : '发布评论'}
               </button>
             </div>
           </>

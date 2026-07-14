@@ -10,7 +10,7 @@ export const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-const SCHEMA_VERSION = 6
+const SCHEMA_VERSION = 7
 const currentVersion = db.pragma('user_version', { simple: true }) as number
 
 if (currentVersion < 2) {
@@ -102,6 +102,22 @@ if (currentVersion < 6) {
     }
   })
   disableKnownAccounts()
+}
+if (currentVersion < 7) {
+  db.exec(`
+    UPDATE posts SET body = '最近晚上十点半之后经常没有热水，想确认一下是临时维修还是新的供应时间。已经在校园服务小程序提交过一次反馈，有同样情况的同学可以在评论区互相同步消息。'
+      WHERE title = '南区宿舍热水供应时间有调整吗？';
+
+    INSERT INTO comments (post_id, user_id, body, anonymous, created_at)
+    SELECT p.id, u.id, '[[sticker:heart]]', 0, datetime('now', '-12 hours')
+    FROM posts p JOIN users u ON u.username = 'xiaoman'
+    WHERE p.title = '分享一份真实的暑期实习准备路线（含时间表）'
+      AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id AND c.body = '[[sticker:heart]]');
+
+    UPDATE posts SET comment_count = (
+      SELECT COUNT(*) FROM comments c WHERE c.post_id = posts.id AND c.status = 'visible'
+    );
+  `)
 }
 db.pragma(`user_version = ${SCHEMA_VERSION}`)
 

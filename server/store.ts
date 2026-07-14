@@ -1,7 +1,7 @@
 import { db } from './db.js'
 import type { SessionUser } from './auth.js'
 import { canModerate } from './auth.js'
-import { moderateTextWithAI, riskLabel, type ModerationResult } from './moderate.js'
+import { moderateText, moderateTextWithAI, riskLabel, type ModerationResult } from './moderate.js'
 
 export class HttpError extends Error {
   status: number

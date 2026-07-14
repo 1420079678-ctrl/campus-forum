@@ -15,8 +15,9 @@ export default function PostCard({ post, onOpen, onLike, onFavorite, onReport, o
     event.stopPropagation()
     action()
   }
+  const boardTone = ({ '课程学业': 'coral', '校园生活': 'mint', '实习就业': 'gold', '经验问答': 'lavender', '闲置集市': 'sky', '社团活动': 'rose' } as Record<string, string>)[post.board] ?? 'mint'
   return (
-    <article className="post-card clickable" onClick={() => onOpen(post.id)}>
+    <article className={`post-card clickable post-tone-${boardTone}`} onClick={() => onOpen(post.id)}>
       <div className="post-meta">
         <span className="avatar">{post.author.avatar}</span>
         <div className="post-author-copy">

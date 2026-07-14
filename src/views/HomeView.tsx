@@ -115,6 +115,20 @@ export default function HomeView({ user, boards, activeBoard, setActiveBoard, qu
   return (
     <div className="community-layout">
       <section className="feed-shell">
+        <div className="campus-moment">
+          <div className="moment-copy">
+            <span><i />校园此刻 · CAMPUS NOW</span>
+            <h2>今天的嘉大，也有新鲜事。</h2>
+            <p>分享一刻，遇见同频的人。</p>
+          </div>
+          <div className="moment-art" aria-hidden="true">
+            <i className="moment-sun" />
+            <i className="moment-hill hill-one" /><i className="moment-hill hill-two" />
+            <span className="moment-note note-book">📚<b>期末搭子</b></span>
+            <span className="moment-note note-coffee">☕<b>下课续命</b></span>
+            <span className="moment-note note-ball">🏸<b>操场见</b></span>
+          </div>
+        </div>
         <header className="feed-head">
           <div>
             <span className="campus-label"><MapPin size={13} />嘉兴大学</span>

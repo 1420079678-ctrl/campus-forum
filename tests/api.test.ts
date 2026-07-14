@@ -35,7 +35,7 @@ before(async () => {
       CAMPUS_FORUM_UPLOADS: join(temp, 'uploads'),
       CAMPUS_EMAIL_DOMAINS: 'example.edu.cn',
     },
-    stdio: 'ignore',
+    stdio: process.env.DEBUG_TEST_SERVER ? 'inherit' : 'ignore',
   })
   for (let attempt = 0; attempt < 50; attempt++) {
     try {
@@ -99,6 +99,13 @@ test('verified student can publish, follow and message', async () => {
   })
   assert.equal(created.status, 201)
   assert.equal(created.data.post.images.length, 1)
+
+  const stickerComment = await request(`/api/posts/${created.data.post.id}/comments`, {
+    method: 'POST', token,
+    body: { body: '[[sticker:cheer]]', anonymous: false },
+  })
+  assert.equal(stickerComment.status, 201, JSON.stringify(stickerComment.data))
+  assert.equal(stickerComment.data.data.body, '[[sticker:cheer]]')
 
   const followed = await request('/api/users/12/follow', { method: 'POST', token })
   assert.equal(followed.status, 200)
