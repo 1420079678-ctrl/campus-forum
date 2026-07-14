@@ -5,16 +5,24 @@ import type { Board, ModerationResult, Post } from '../types'
 
 type PublishPayload = { post: Post; moderation: ModerationResult }
 
-export default function Composer({ boards, editPost, onClose, onPublished }: {
+export type ComposerPreset = {
+  board?: string
+  tags?: string[]
+  titlePlaceholder?: string
+  bodyPlaceholder?: string
+}
+
+export default function Composer({ boards, editPost, preset, onClose, onPublished }: {
   boards: Board[]
   editPost?: Post
+  preset?: ComposerPreset | null
   onClose: () => void
   onPublished: (post: Post, moderation: ModerationResult) => void
 }) {
-  const [board, setBoard] = useState(editPost?.board ?? boards[0]?.name ?? '课程学业')
+  const [board, setBoard] = useState(editPost?.board ?? preset?.board ?? boards[0]?.name ?? '课程学业')
   const [title, setTitle] = useState(editPost?.title ?? '')
   const [body, setBody] = useState(editPost?.body ?? '')
-  const [tagsInput, setTagsInput] = useState(editPost?.tags.join(' ') ?? '')
+  const [tagsInput, setTagsInput] = useState(editPost?.tags.join(' ') ?? preset?.tags?.join(' ') ?? '')
   const [images, setImages] = useState<string[]>(editPost?.images ?? [])
   const [anonymous, setAnonymous] = useState(editPost?.author.anonymous ?? false)
   const [error, setError] = useState('')
@@ -89,10 +97,10 @@ export default function Composer({ boards, editPost, onClose, onPublished }: {
           </select>
         </label>
         <label>标题 <small className="char-count">{title.trim().length}/60</small>
-          <input autoFocus value={title} maxLength={60} onChange={(event) => setTitle(event.target.value)} placeholder="一句话说清楚你想讨论什么（至少 5 个字）" />
+          <input autoFocus value={title} maxLength={60} onChange={(event) => setTitle(event.target.value)} placeholder={preset?.titlePlaceholder ?? '一句话说清楚你想讨论什么（至少 5 个字）'} />
         </label>
         <label>正文 <small className="char-count">{body.trim().length}/5000</small>
-          <textarea value={body} maxLength={5000} onChange={(event) => setBody(event.target.value)} placeholder="补充背景、你的尝试和希望得到的帮助…（至少 10 个字）" rows={6} />
+          <textarea value={body} maxLength={5000} onChange={(event) => setBody(event.target.value)} placeholder={preset?.bodyPlaceholder ?? '补充背景、你的尝试和希望得到的帮助…（至少 10 个字）'} rows={6} />
         </label>
         <label>标签（可选，空格或逗号分隔，最多 4 个）
           <input value={tagsInput} onChange={(event) => setTagsInput(event.target.value)} placeholder="如：期末复习 数据库" />

@@ -122,3 +122,23 @@ test('verified student can publish, follow and message', async () => {
   assert.equal(pulse.data.data.campus, '嘉兴大学')
   assert.ok(Array.isArray(pulse.data.data.hotPosts))
 })
+
+test('campus scenes have student-only cold-start content', async () => {
+  const market = await request('/api/posts?board=%E9%97%B2%E7%BD%AE%E9%9B%86%E5%B8%82&pageSize=20')
+  assert.equal(market.status, 200)
+  assert.ok(market.data.items.length >= 4)
+  assert.ok(market.data.items.every((post: any) => post.board === '闲置集市'))
+
+  const errands = await request('/api/posts?q=%E8%B7%91%E8%85%BF&pageSize=20')
+  assert.equal(errands.status, 200)
+  assert.ok(errands.data.items.length >= 4)
+
+  const lost = await request('/api/posts?q=%E5%A4%B1%E7%89%A9&pageSize=20')
+  assert.equal(lost.status, 200)
+  assert.ok(lost.data.items.length >= 4)
+  const pets = await request('/api/posts?q=%E5%AE%A0%E7%89%A9&pageSize=20')
+  assert.equal(pets.status, 200)
+  assert.ok(pets.data.items.length >= 2)
+  assert.ok([...market.data.items, ...errands.data.items, ...lost.data.items]
+    .every((post: any) => !['教师', '职能部门'].includes(post.author.roleLabel)))
+})

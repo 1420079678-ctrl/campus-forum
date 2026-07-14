@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { hashPassword, verifyPassword } from './password.js'
@@ -10,7 +11,7 @@ export const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-const SCHEMA_VERSION = 7
+const SCHEMA_VERSION = 8
 const currentVersion = db.pragma('user_version', { simple: true }) as number
 
 if (currentVersion < 2) {
@@ -119,7 +120,110 @@ if (currentVersion < 7) {
     );
   `)
 }
+if (currentVersion < 8) {
+  seedCampusScenes()
+}
 db.pragma(`user_version = ${SCHEMA_VERSION}`)
+
+function seedCampusScenes() {
+  const insertStudent = db.prepare(`
+    INSERT OR IGNORE INTO users (
+      username, password_hash, nickname, role, dept, grade, bio, verified, status,
+      campus, verification_status, created_at
+    ) VALUES (@username, @passwordHash, @nickname, 'student', @dept, @grade, @bio, 1, 'active',
+      '嘉兴大学', 'verified', datetime('now', @age))
+  `)
+  const insertPost = db.prepare(`
+    INSERT INTO posts (
+      user_id, board_id, title, body, tags, images, anonymous, status, featured,
+      view_count, risk_level, risk_reasons, created_at, updated_at
+    )
+    SELECT u.id, b.id, @title, @body, @tags, '[]', 0, 'visible', 0,
+      @viewCount, 'low', '[]', datetime('now', @age), datetime('now', @age)
+    FROM users u JOIN boards b ON b.name = @board
+    WHERE u.username = @user
+      AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.title = @title)
+  `)
+  const getPost = db.prepare('SELECT id FROM posts WHERE title = ?')
+  const insertComment = db.prepare(`
+    INSERT INTO comments (post_id, user_id, body, anonymous, created_at)
+    SELECT @postId, u.id, @body, 0, datetime('now', @age)
+    FROM users u WHERE u.username = @user
+      AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.post_id = @postId AND c.body = @body)
+  `)
+  const insertLike = db.prepare(`
+    INSERT OR IGNORE INTO likes (user_id, target_type, target_id)
+    SELECT id, 'post', @postId FROM users WHERE username = @user AND status = 'active'
+  `)
+
+  const run = db.transaction(() => {
+    const students = [
+      ['seed_yutong', '俞桐', '设计学院', '大二', '喜欢拍照、逛展和把校园生活记下来。'],
+      ['seed_ake', '阿柯', '信息科学与工程学院', '大三', '代码、骑行、羽毛球。'],
+      ['seed_beibei', '贝贝', '商学院', '大一', '还在解锁嘉大的每个角落。'],
+      ['seed_nanfeng', '南风', '建筑工程学院', '大二', '暑期留校中，偶尔出没在操场。'],
+      ['seed_orange', '橘子汽水', '外国语学院', '大三', '探店和英语学习两手抓。'],
+      ['seed_mumu', '木木', '师范学院', '大二', '自习搭子长期招募。'],
+      ['seed_xiaoyu', '小宇', '材料与纺织工程学院', '大三', '喜欢折腾数码，也爱捡漏。'],
+      ['seed_qiqi', '七七', '生物与化学工程学院', '大一', '校园猫观察员。'],
+    ] as const
+    students.forEach(([username, nickname, dept, grade, bio], index) => insertStudent.run({
+      username, nickname, dept, grade, bio,
+      passwordHash: hashPassword(randomUUID()),
+      age: `-${48 + index * 7} days`,
+    }))
+
+    const posts = [
+      { user: 'seed_xiaoyu', board: '闲置集市', title: '毕业季出宿舍小冰箱，南区自取', body: '用了两年，制冷正常，内部已经清洗消毒。尺寸适合放宿舍桌下，原价四百多，现在 120 出。只接受校内当面看货，南区宿舍楼下自取，不收任何定金。', tags: ['二手', '宿舍好物', '校内自取'], views: 186, age: '-45 minutes', comments: [['seed_beibei', '请问噪音大吗？晚上放宿舍会不会影响睡觉？'], ['seed_xiaoyu', '低档基本听不到，高档压缩机启动时会有一点声音，可以先来看。']] },
+      { user: 'seed_ake', board: '闲置集市', title: '收一台 24 寸显示器，预算 300 左右', body: '暑期留校做项目，想收一台能竖屏的显示器，1080P 就够用。最好在越秀校区附近，可以当面测试亮点和接口，价格看成色商量。', tags: ['二手', '数码', '求购'], views: 93, age: '-2 hours', comments: [['linlin', '我有一台 AOC 24 寸，支架不能旋转但可以送竖屏支架。'], ['seed_ake', '可以，方便的话站内私信发一下型号。']] },
+      { user: 'seed_nanfeng', board: '闲置集市', title: '出两支胜利入门羽毛球拍，带拍包', body: '社团训练换拍后闲置，两支都重新拉过 24 磅线，拍框有正常使用痕迹，没有裂纹。两支一起 150，体育馆附近面交，可以现场试挥。', tags: ['二手', '羽毛球', '运动装备'], views: 128, age: '-4 hours', comments: [['seed_mumu', '新手女生用会不会太重？'], ['seed_nanfeng', '都是 4U，比较轻，第一次打也能用。']] },
+      { user: 'wang', board: '闲置集市', title: '毕业整理：考研政治资料免费送', body: '肖四肖八和自己的错题整理都还在，部分有笔记。免费送给准备考研的学弟学妹，不邮寄，东区食堂门口自取。希望拿走后真的会用，不要二次转卖。', tags: ['闲置', '考研资料', '免费送'], views: 241, age: '-7 hours', comments: [['demo', '想要错题整理，已经站内私信你了。'], ['wang', '收到，今晚七点之后可以来拿。']] },
+      { user: 'seed_beibei', board: '校园生活', title: '明早东门取快递，求顺路带到越秀宿舍', body: '明天早上有个小件快递到东门驿站，但我八点有课赶不过去。有没有九点前会经过东门的同学愿意顺路带到越秀宿舍楼下？有一杯奶茶感谢，取件码走站内私信。', tags: ['跑腿', '同学互助', '快递'], views: 104, age: '-35 minutes', comments: [['seed_orange', '我明早八点半会经过，可以帮你带。'], ['seed_beibei', '太感谢了，我私信你取件信息。']] },
+      { user: 'seed_mumu', board: '校园生活', title: '求帮忙打印装订一份比赛材料', body: '人在校外参加调研，今晚九点前需要把 28 页材料双面打印并胶装，送到经管楼值班室。打印和跑腿费用都可以报销，有空的同学请站内联系。', tags: ['跑腿', '打印', '比赛'], views: 77, age: '-3 hours', comments: [['demo', '文印店八点半关门，建议尽快发文件。'], ['seed_mumu', '已经找到同学帮忙了，谢谢大家。']] },
+      { user: 'zhou', board: '校园生活', title: '周五下午嘉兴南站回学校，有人拼车吗', body: '周五 15:20 到嘉兴南站，一个行李箱。想找两三位同学一起打车回越秀校区，车费按平台实际金额平摊，全程在站内沟通。', tags: ['拼车', '跑腿', '返校'], views: 163, age: '-5 hours', comments: [['seed_nanfeng', '我 15:12 到站，可以一起。'], ['zhou', '好，我建个站内小群前再确认到站时间。']] },
+      { user: 'seed_qiqi', board: '校园生活', title: '暑期留校，找同学帮忙喂三天猫', body: '周末临时回家，猫在校外租房，需要周五晚到周日晚每天加一次粮、换水并拍照反馈。距离北门步行五分钟，会提前准备好用品，优先有养猫经验的同学。', tags: ['跑腿', '宠物', '暑期留校'], views: 152, age: '-9 hours', comments: [['seed_yutong', '我养过猫，周末也在学校，可以先见面熟悉一下。'], ['seed_qiqi', '好呀，我站内联系你，谢谢！']] },
+      { user: 'xiaoman', board: '校园生活', title: '梁林校区捡到一张校园卡，已交保卫室', body: '今天 12:40 在一食堂门口捡到校园卡，姓名最后一个字是“宁”。已经交到附近保卫室，失主带上能证明身份的信息去领取，不要在评论区公开学号。', tags: ['失物招领', '校园卡', '梁林校区'], views: 219, age: '-55 minutes', comments: [['seed_beibei', '帮顶，卡主应该很着急。'], ['seed_orange', '已转到班群，注意保护学号做得很好。']] },
+      { user: 'seed_orange', board: '校园生活', title: '寻找蓝色 AirPods 耳机盒，可能落在图书馆', body: '昨晚九点左右从图书馆二楼到东门这段路上丢了一个蓝色硅胶耳机盒，外壳挂着一个小橘子挂件。耳机还在我这里，捡到盒子的同学请站内联系，有奶茶感谢。', tags: ['失物', '寻物', '图书馆'], views: 133, age: '-2 hours', comments: [['seed_yutong', '二楼服务台问过了吗？那里有失物箱。'], ['seed_orange', '刚问过暂时没有，我晚点再去一次。']] },
+      { user: 'seed_nanfeng', board: '校园生活', title: '体育馆二楼捡到一副黑框眼镜', body: '今晚羽毛球场散场后在 7 号场边捡到黑框眼镜，镜腿内侧有一串白色字母。暂时放在体育馆前台，失主描述一下眼镜盒颜色即可领取。', tags: ['失物招领', '体育馆', '眼镜'], views: 88, age: '-4 hours', comments: [['linlin', '我们群里有人在找，已经把帖子发给他了。'], ['seed_nanfeng', '谢谢，前台九点半下班，最好今晚去。']] },
+      { user: 'demo', board: '校园生活', title: '教学楼门口拿错透明雨伞的同学看这里', body: '下午下雨时在五号楼门口拿到一把很像自己的透明伞，回宿舍才发现伞柄贴着一只黄色小鸭。我自己的伞柄有绿色胶带，应该是互相拿错了，可以约食堂门口换回来。', tags: ['失物', '雨伞', '拿错'], views: 146, age: '-8 hours', comments: [['seed_mumu', '黄色小鸭是我的！我拿到的那把正好有绿色胶带。'], ['demo', '破案了，我私信你约时间。']] },
+      { user: 'seed_nanfeng', board: '社团活动', title: '暑期晨跑搭子：每周一三五操场见', body: '暑期留校不想一直宅宿舍，计划每周一三五早上 6:40 在越秀操场慢跑三公里，配速七分左右，新手友好。下雨就改成室内拉伸，不卷速度，只求互相叫醒。', tags: ['搭子', '晨跑', '暑期留校'], views: 174, age: '-70 minutes', comments: [['seed_qiqi', '七分配速可以，周三开始算我一个。'], ['seed_nanfeng', '欢迎，周三 6:35 操场入口集合。']] },
+      { user: 'seed_mumu', board: '社团活动', title: '图书馆六级搭子，想一起坚持到考试', body: '准备十二月六级，计划工作日晚上七点到九点在图书馆三楼：一小时真题，一小时听力和复盘。想找两三位能稳定出勤的同学，学院不限，基础一般也没关系。', tags: ['搭子', '英语六级', '自习'], views: 201, age: '-3 hours', comments: [['xiaoman', '我听力比较弱，可以一起吗？'], ['seed_mumu', '当然可以，我们正好可以分工整理错题。']] },
+      { user: 'linlin', board: '社团活动', title: '周四晚羽毛球新手局，还差两个人', body: '周四 19:00-21:00 体育馆订了两个场，目前四个人，还差两位。水平都是能对打但不专业，球费和场地费 AA，拍子不够可以借，拒绝压力局。', tags: ['搭子', '羽毛球', '新手局'], views: 265, age: '-5 hours', comments: [['seed_beibei', '我和室友两个新手，可以一起吗？'], ['linlin', '正好满员，我把场地号私信你。']] },
+      { user: 'seed_orange', board: '社团活动', title: '周末市区探店搭子，想去吃新开的融合菜', body: '周六傍晚想去月河附近新开的融合菜，人均大概 70。本人女生，大三，比较喜欢拍照但不会一直等出片。想找一两位同学一起，先在校内公共区域见面再出发。', tags: ['搭子', '探店', '周末'], views: 179, age: '-10 hours', comments: [['seed_yutong', '我也收藏了那家，拍照速度很快哈哈。'], ['seed_orange', '听起来很合拍，我站内找你。']] },
+      { user: 'seed_yutong', board: '社团活动', title: '草坪音乐夜开放报名，会乐器不会乐器都能来', body: '本周六 19:00 在大学生活动中心旁草坪办小型音乐夜，有吉他、键盘和开放麦。观众不用报名，想上台的同学在评论区写节目类型，我们会站内联系确认设备需求。', tags: ['校园活动', '音乐', '开放麦'], views: 388, age: '-90 minutes', comments: [['demo', '纯观众可以带野餐垫吗？'], ['seed_yutong', '可以，但请不要挡住中间通道，结束后带走垃圾。']] },
+      { user: 'seed_yutong', board: '社团活动', title: '周日校园摄影散步：只带手机也欢迎', body: '周日下午四点从图书馆出发，沿河边走到老教学楼，主题是“夏天的绿色”。不讲复杂参数，主要交换构图思路，手机和相机都可以，预计一个半小时。', tags: ['校园活动', '摄影', '散步'], views: 216, age: '-4 hours', comments: [['xiaoman', '零基础手机党报名！'], ['seed_yutong', '欢迎，记得提前清一点手机存储空间。']] },
+      { user: 'buaoye', board: '社团活动', title: '大学生创新项目路演，招募现场体验观众', body: '周五下午在经管楼报告厅有六个学生项目做阶段路演，需要招募 30 位体验观众填写匿名反馈。全程约 90 分钟，会提供饮料和项目纪念贴纸，适合对创业比赛感兴趣的同学。', tags: ['校园活动', '创新创业', '路演'], views: 194, age: '-7 hours', comments: [['seed_ake', '计算机学院的项目多吗？'], ['buaoye', '六个里面有两个数字校园方向，欢迎来提意见。']] },
+      { user: 'seed_qiqi', board: '社团活动', title: '校园流浪动物志愿者暑期补招', body: '暑期留校人少，现补招几位志愿者协助定点添粮、清洁和记录校园猫状态。每人每周认领一次时段，不允许随意投喂人类食物，也不要擅自抓猫。会统一培训。', tags: ['校园活动', '志愿者', '校园猫'], views: 307, age: '-11 hours', comments: [['seed_beibei', '大一可以参加吗？暑期大部分时间都在。'], ['seed_qiqi', '可以，第一次会有老志愿者带着走一遍。']] },
+      { user: 'seed_qiqi', board: '校园生活', title: '东区小橘猫今天终于肯靠近人了', body: '连续观察一周，东区那只戴反光项圈的小橘猫精神很好，今天下午在树荫下主动靠近了志愿者。提醒大家不要追着抱，也不要喂火腿肠，远距离看看就好。', tags: ['宠物', '校园猫', '日常'], views: 351, age: '-6 hours', comments: [['seed_yutong', '是尾巴尖有一点白的那只吗？'], ['seed_qiqi', '对，就是它，项圈上还有联系方式牌。']] },
+      { user: 'seed_ake', board: '课程学业', title: '暑期互联网+竞赛组队，缺一位视觉设计', body: '目前队里有产品、开发和商科同学，项目方向是校园闲置循环。原型和基础数据已经完成，缺一位能做视觉系统和路演版式的同学。不是临时挂名，希望每周能稳定开一次会。', tags: ['搭子', '竞赛组队', '视觉设计'], views: 223, age: '-13 hours', comments: [['seed_yutong', '可以先看看现有原型和时间安排吗？'], ['seed_ake', '可以，我把脱敏版原型通过站内私信发你。']] },
+      { user: 'seed_ake', board: '社团活动', title: '周三晚绿道轻松夜骑，均速 18 左右', body: '周三 19:10 北门集合，走绿道往返大约 22 公里，预计两个小时。必须戴头盔和带车灯，中途不竞速，新手跟不上会等。天气预报下雨则在帖子里取消。', tags: ['搭子', '骑行', '夜骑'], views: 196, age: '-15 hours', comments: [['seed_nanfeng', '共享单车能跟吗？'], ['seed_ake', '不建议，距离有点长，普通通勤车可以。']] },
+      { user: 'seed_beibei', board: '校园生活', title: '第一次暑期留校，有哪些食堂窗口还开着', body: '刚开始暑期留校，发现食堂窗口比平时少很多。想整理一份还在营业的窗口和时间，方便大家少跑空。有确认过的同学可以评论窗口、楼层和大概营业时间，我会汇总到正文。', tags: ['暑期留校', '食堂', '校园互助'], views: 284, age: '-18 hours', comments: [['seed_orange', '二楼面档中午开到一点半，晚上五点到七点。'], ['demo', '一楼早餐窗口七点到九点还在，周末也开。']] },
+    ] as const
+
+    const likerPool = ['linlin', 'xiaoman', 'demo', 'zhou', 'wang', 'seed_yutong', 'seed_ake', 'seed_beibei', 'seed_nanfeng', 'seed_orange', 'seed_mumu', 'seed_qiqi']
+    posts.forEach((post, index) => {
+      insertPost.run({
+        user: post.user, board: post.board, title: post.title, body: post.body,
+        tags: JSON.stringify(post.tags), viewCount: post.views, age: post.age,
+      })
+      const row = getPost.get(post.title) as { id: number } | undefined
+      if (!row) return
+      post.comments.forEach(([user, body], commentIndex) => insertComment.run({
+        postId: row.id, user, body, age: `-${Math.max(10, 35 + index * 9 - commentIndex * 7)} minutes`,
+      }))
+      const likeCount = 3 + (index % 5)
+      for (let offset = 0; offset < likeCount; offset += 1) {
+        insertLike.run({ postId: row.id, user: likerPool[(index + offset) % likerPool.length] })
+      }
+    })
+
+    db.exec(`
+      UPDATE posts SET like_count = (SELECT COUNT(*) FROM likes WHERE target_type = 'post' AND target_id = posts.id);
+      UPDATE posts SET comment_count = (SELECT COUNT(*) FROM comments WHERE post_id = posts.id AND status = 'visible');
+    `)
+  })
+  run()
+}
 
 function migrate() {
   db.exec(`

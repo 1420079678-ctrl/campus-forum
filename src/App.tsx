@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bell, CheckCircle2, ChevronRight, Compass, Home, LockKeyhole, LogIn,
-  Menu, MessageCircle, Plus, Search, Settings2, ShieldCheck, UserRound,
+  Map, Menu, MessageCircle, Plus, Search, Settings2, ShieldCheck, UserRound,
 } from 'lucide-react'
 import './App.css'
 import { api, hasToken, setToken } from './api'
 import { boardIcon } from './boardMeta'
 import { formatCount } from './format'
 import AuthModal from './components/AuthModal'
-import Composer from './components/Composer'
+import Composer, { type ComposerPreset } from './components/Composer'
 import ReportModal, { type ReportTargetInput } from './components/ReportModal'
 import NotificationsPanel from './components/NotificationsPanel'
 import HomeView from './views/HomeView'
@@ -18,6 +18,7 @@ import ProfileView from './views/ProfileView'
 import UserView from './views/UserView'
 import AdminView from './views/AdminView'
 import MessagesView from './views/MessagesView'
+import CampusView from './views/CampusView'
 import type { Board, CommentItem, Me, MyStats, Post } from './types'
 
 type Route =
@@ -27,6 +28,7 @@ type Route =
   | { tab: 'moderation' }
   | { tab: 'admin' }
   | { tab: 'profile' }
+  | { tab: 'campus' }
   | { tab: 'messages'; userId?: number }
 
 function parseRoute(hash: string): Route {
@@ -40,6 +42,7 @@ function parseRoute(hash: string): Route {
   if (path.startsWith('/moderation')) return { tab: 'moderation' }
   if (path.startsWith('/admin')) return { tab: 'admin' }
   if (path.startsWith('/profile')) return { tab: 'profile' }
+  if (path.startsWith('/campus')) return { tab: 'campus' }
   return { tab: 'home' }
 }
 
@@ -54,6 +57,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [composerOpen, setComposerOpen] = useState(false)
+  const [composerPreset, setComposerPreset] = useState<ComposerPreset | null>(null)
   const [notifOpen, setNotifOpen] = useState(false)
   const [reportTarget, setReportTarget] = useState<ReportTargetInput | null>(null)
   const [unread, setUnread] = useState(0)
@@ -164,6 +168,18 @@ function App() {
       navigate('/profile')
       return
     }
+    setComposerPreset(null)
+    setComposerOpen(true)
+  }
+
+  const openPresetComposer = (preset: ComposerPreset) => {
+    if (!requireAuth()) return
+    if (!user?.verified) {
+      notify('完成校园邮箱验证后即可发布校园信息')
+      navigate('/profile')
+      return
+    }
+    setComposerPreset(preset)
     setComposerOpen(true)
   }
 
@@ -233,6 +249,7 @@ function App() {
           <nav className="main-nav">
             <NavItem icon={Home} label="首页动态" active={route.tab === 'home' || route.tab === 'post' || route.tab === 'user'} onClick={() => navigate('/')} />
             <NavItem icon={Compass} label="发现热榜" onClick={openHot} />
+            <NavItem icon={Map} label="校园生活站" active={route.tab === 'campus'} onClick={() => navigate('/campus')} />
             <NavItem icon={MessageCircle} label="同学私信" active={route.tab === 'messages'} badge={messageUnread > 0 ? String(messageUnread) : undefined} onClick={() => navigate('/messages')} />
             {canModerate && <NavItem icon={ShieldCheck} label="内容审核台" active={route.tab === 'moderation'} badge={modPending > 0 ? String(modPending) : undefined} onClick={() => navigate('/moderation')} />}
             {isAdmin && <NavItem icon={Settings2} label="管理后台" active={route.tab === 'admin'} onClick={() => navigate('/admin')} />}
@@ -292,6 +309,17 @@ function App() {
               onChanged={() => setFeedRefresh((value) => value + 1)}
             />
           )}
+          {route.tab === 'campus' && (
+            <CampusView
+              user={user}
+              refreshKey={feedRefresh}
+              onCompose={openPresetComposer}
+              navigate={navigate}
+              notify={notify}
+              requireAuth={requireAuth}
+              onReport={handleReportPost}
+            />
+          )}
           {route.tab === 'user' && (
             <UserView
               id={route.id}
@@ -334,7 +362,7 @@ function App() {
 
       <nav className="mobile-bottom-nav" aria-label="手机端主导航">
         <button className={route.tab === 'home' || route.tab === 'post' ? 'active' : ''} onClick={() => navigate('/')}><Home size={20} /><span>首页</span></button>
-        <button onClick={openHot}><Compass size={20} /><span>热榜</span></button>
+        <button className={route.tab === 'campus' ? 'active' : ''} onClick={() => navigate('/campus')}><Map size={20} /><span>校园</span></button>
         <button className="mobile-create" onClick={openComposer} aria-label="发布讨论"><span><Plus size={23} /></span><small>发布</small></button>
         <button className={route.tab === 'messages' ? 'active' : ''} onClick={() => navigate('/messages')}><MessageCircle size={20} /><span>私信</span>{messageUnread > 0 && <b>{messageUnread}</b>}</button>
         <button className={route.tab === 'profile' ? 'active' : ''} onClick={() => navigate('/profile')}><UserRound size={20} /><span>我的</span></button>
@@ -355,9 +383,11 @@ function App() {
       {composerOpen && (
         <Composer
           boards={boards}
-          onClose={() => setComposerOpen(false)}
+          preset={composerPreset}
+          onClose={() => { setComposerOpen(false); setComposerPreset(null) }}
           onPublished={(post, moderation) => {
             setComposerOpen(false)
+            setComposerPreset(null)
             setFeedRefresh((value) => value + 1)
             if (post.status === 'pending') {
               notify(`AI 判定为${moderation.risk === 'high' ? '高' : '中'}风险，帖子将在人工复核通过后公开`)
