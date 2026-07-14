@@ -1,0 +1,9 @@
+services:
+  campus-forum:
+    build: .
+    container_name: campus-forum
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
