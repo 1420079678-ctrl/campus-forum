@@ -12,6 +12,7 @@
     "lint": "oxlint",
     "test": "tsx --test tests/*.test.ts",
     "check": "npm run lint && npm run test && npm run build",
+    "admin:create": "tsx scripts/create-admin.ts",
     "export:data": "tsx scripts/export-data.ts",
     "preview": "vite preview"
   },

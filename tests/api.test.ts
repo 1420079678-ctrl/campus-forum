@@ -57,6 +57,12 @@ after(async () => {
 })
 
 test('verified student can publish, follow and message', async () => {
+  const defaultAdmin = await request('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'admin', password: 'admin123456' },
+  })
+  assert.equal(defaultAdmin.status, 401)
+
   const username = `student${String(Date.now()).slice(-8)}`
   const registered = await request('/api/auth/register', {
     method: 'POST',

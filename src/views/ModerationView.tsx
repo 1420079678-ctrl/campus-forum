@@ -42,7 +42,7 @@ export default function ModerationView({ user, notify, requireAuth, navigate, on
         <div className="empty-state">
           <LockKeyhole size={26} />
           <h3>内容审核台仅对审核人员开放</h3>
-          <p>使用演示账号 mod / demo123456 登录可以体验完整审核流程。</p>
+          <p>此页面仅供获得授权的社区审核员和管理员使用。</p>
           {!user && <button className="primary-button" onClick={() => requireAuth()}>登录</button>}
         </div>
       </div>

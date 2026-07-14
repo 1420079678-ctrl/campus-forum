@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { hashPassword } from './password.js'
+import { hashPassword, verifyPassword } from './password.js'
 
 const dbPath = resolve(process.env.CAMPUS_FORUM_DB ?? './data/campus-forum.db')
 mkdirSync(dirname(dbPath), { recursive: true })
@@ -10,7 +10,7 @@ export const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-const SCHEMA_VERSION = 5
+const SCHEMA_VERSION = 6
 const currentVersion = db.pragma('user_version', { simple: true }) as number
 
 if (currentVersion < 2) {
@@ -87,6 +87,21 @@ if (currentVersion < 5) {
       SELECT COUNT(*) FROM comments c WHERE c.post_id = posts.id AND c.status = 'visible'
     );
   `)
+}
+if (currentVersion < 6) {
+  const knownPrivilegedAccounts = [
+    ['admin', 'admin123456'],
+    ['mod', 'demo123456'],
+  ] as const
+  const disableKnownAccounts = db.transaction(() => {
+    for (const [username, password] of knownPrivilegedAccounts) {
+      const row = db.prepare('SELECT id, password_hash as passwordHash FROM users WHERE username = ?').get(username) as { id: number; passwordHash: string } | undefined
+      if (!row || !verifyPassword(password, row.passwordHash)) continue
+      db.prepare("UPDATE users SET status = 'banned' WHERE id = ?").run(row.id)
+      db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.id)
+    }
+  })
+  disableKnownAccounts()
 }
 db.pragma(`user_version = ${SCHEMA_VERSION}`)
 
