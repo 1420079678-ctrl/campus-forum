@@ -68,7 +68,7 @@ test('verified student can publish, follow and message', async () => {
 
   const blocked = await request('/api/posts', {
     method: 'POST', token,
-    body: { board: '学习交流', title: '验证前不能发布', body: '这是一段满足长度要求的测试正文。', tags: [], images: [] },
+    body: { board: '课程学业', title: '验证前不能发布', body: '这是一段满足长度要求的测试正文。', tags: [], images: [] },
   })
   assert.equal(blocked.status, 403)
 
@@ -89,7 +89,7 @@ test('verified student can publish, follow and message', async () => {
 
   const created = await request('/api/posts', {
     method: 'POST', token,
-    body: { board: '学习交流', title: '验证后的第一篇帖子', body: '现在已经通过校园身份验证，可以正常发布内容。', tags: ['测试'], images: [uploaded.data.data.url] },
+    body: { board: '课程学业', title: '验证后的第一篇帖子', body: '现在已经通过校园身份验证，可以正常发布内容。', tags: ['测试'], images: [uploaded.data.data.url] },
   })
   assert.equal(created.status, 201)
   assert.equal(created.data.post.images.length, 1)
@@ -103,4 +103,9 @@ test('verified student can publish, follow and message', async () => {
   const thread = await request('/api/messages/12', { token })
   assert.equal(thread.status, 200)
   assert.equal(thread.data.data.messages.length, 1)
+
+  const pulse = await request('/api/pulse')
+  assert.equal(pulse.status, 200)
+  assert.equal(pulse.data.data.campus, '嘉兴大学')
+  assert.ok(Array.isArray(pulse.data.data.hotPosts))
 })

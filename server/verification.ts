@@ -3,10 +3,10 @@ import { db } from './db.js'
 import { hashPassword, verifyPassword, type SessionUser } from './auth.js'
 import { HttpError } from './store.js'
 
-const campusName = process.env.CAMPUS_NAME?.trim() || '知行大学'
+const campusName = process.env.CAMPUS_NAME?.trim() || '嘉兴大学'
 
 function allowedDomains() {
-  return (process.env.CAMPUS_EMAIL_DOMAINS ?? 'edu.cn')
+  return (process.env.CAMPUS_EMAIL_DOMAINS ?? 'zjxu.edu.cn')
     .split(',')
     .map((item) => item.trim().toLowerCase().replace(/^@/, ''))
     .filter(Boolean)

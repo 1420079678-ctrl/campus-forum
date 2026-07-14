@@ -46,7 +46,7 @@ export default function AuthModal({ onClose, onAuthed }: { onClose: () => void; 
         <div className="modal-head">
           <div>
             <span className="section-kicker">{mode === 'login' ? 'WELCOME BACK' : 'JOIN THE COMMONS'}</span>
-            <h2>{mode === 'login' ? '欢迎回到知行里' : '加入知行里'}</h2>
+            <h2>{mode === 'login' ? '欢迎回到嘉大圈' : '加入嘉大圈'}</h2>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="关闭"><X size={19} /></button>
         </div>

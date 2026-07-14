@@ -95,7 +95,7 @@ export default function UserView({ id, user, navigate, notify, requireAuth, onRe
         <div>
           <span className="verified-label"><UserRound size={14} />{profile.roleLabel}</span>
           <h1>{profile.nickname}</h1>
-          <p><CalendarDays size={12} style={{ verticalAlign: '-2px' }} /> 加入知行里 {profile.joinedDays} 天</p>
+          <p><CalendarDays size={12} style={{ verticalAlign: '-2px' }} /> 加入嘉大圈 {profile.joinedDays} 天</p>
           {profile.bio && <p className="profile-bio">{profile.bio}</p>}
         </div>
         {user?.id !== profile.id && (

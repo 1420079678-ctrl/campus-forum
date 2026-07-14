@@ -9,6 +9,7 @@ import type { AdminUser, Board, Me } from '../types'
 import { ROLE_LABEL } from '../types'
 
 const BOARD_COLORS = ['coral', 'mint', 'gold', 'lavender', 'sky', 'rose']
+const ACTIVE_ROLES: Me['role'][] = ['student', 'moderator', 'admin']
 
 export default function AdminView({ user, notify, requireAuth, navigate, onBoardsChanged }: {
   user: Me | null
@@ -128,7 +129,7 @@ export default function AdminView({ user, notify, requireAuth, navigate, onBoard
               disabled={item.id === user.id || busyId === item.id}
               onChange={(event) => patchUser(item, { role: event.target.value }, `已将 ${item.nickname} 的角色调整为「${ROLE_LABEL[event.target.value as Me['role']]}」`)}
             >
-              {Object.entries(ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {ACTIVE_ROLES.map((value) => <option key={value} value={value}>{ROLE_LABEL[value]}</option>)}
             </select>
             {item.status === 'active' ? (
               <button

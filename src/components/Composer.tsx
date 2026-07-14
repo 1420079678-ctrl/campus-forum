@@ -11,7 +11,7 @@ export default function Composer({ boards, editPost, onClose, onPublished }: {
   onClose: () => void
   onPublished: (post: Post, moderation: ModerationResult) => void
 }) {
-  const [board, setBoard] = useState(editPost?.board ?? boards[0]?.name ?? '学习交流')
+  const [board, setBoard] = useState(editPost?.board ?? boards[0]?.name ?? '课程学业')
   const [title, setTitle] = useState(editPost?.title ?? '')
   const [body, setBody] = useState(editPost?.body ?? '')
   const [tagsInput, setTagsInput] = useState(editPost?.tags.join(' ') ?? '')

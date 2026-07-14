@@ -130,6 +130,14 @@ export type CommunityStats = {
   knowledgeCount: number
 }
 
+export type CommunityPulse = {
+  campus: string
+  onlineNow: number
+  trendingTags: Array<{ name: string; count: number; rank: number }>
+  hotPosts: Array<{ id: number; title: string; board: string; likeCount: number; commentCount: number; heat: number }>
+  activeStudents: Array<{ id: number; nickname: string; avatar: string; roleLabel: string; contribution: number }>
+}
+
 export type ReportTarget = {
   id: number
   kind: 'post' | 'comment'

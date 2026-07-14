@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Bell, CheckCircle2, ChevronRight, ClipboardList, Home, LockKeyhole, LogIn,
-  Menu, MessageCircle, Search, Settings2, ShieldCheck, Sparkles, UserRound,
+  Bell, CheckCircle2, ChevronRight, Compass, Home, LockKeyhole, LogIn,
+  Menu, MessageCircle, Plus, Search, Settings2, ShieldCheck, UserRound,
 } from 'lucide-react'
 import './App.css'
 import { api, hasToken, setToken } from './api'
@@ -13,7 +13,6 @@ import ReportModal, { type ReportTargetInput } from './components/ReportModal'
 import NotificationsPanel from './components/NotificationsPanel'
 import HomeView from './views/HomeView'
 import PostDetailView from './views/PostDetailView'
-import NeedsView from './views/NeedsView'
 import ModerationView from './views/ModerationView'
 import ProfileView from './views/ProfileView'
 import UserView from './views/UserView'
@@ -25,7 +24,6 @@ type Route =
   | { tab: 'home' }
   | { tab: 'post'; id: number }
   | { tab: 'user'; id: number }
-  | { tab: 'needs' }
   | { tab: 'moderation' }
   | { tab: 'admin' }
   | { tab: 'profile' }
@@ -39,7 +37,6 @@ function parseRoute(hash: string): Route {
   if (userMatch) return { tab: 'user', id: Number(userMatch[1]) }
   const messageMatch = path.match(/^\/messages(?:\/(\d+))?/)
   if (messageMatch) return { tab: 'messages', userId: messageMatch[1] ? Number(messageMatch[1]) : undefined }
-  if (path.startsWith('/needs')) return { tab: 'needs' }
   if (path.startsWith('/moderation')) return { tab: 'moderation' }
   if (path.startsWith('/admin')) return { tab: 'admin' }
   if (path.startsWith('/profile')) return { tab: 'profile' }
@@ -148,7 +145,6 @@ function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [route.tab, navigate])
 
-  const boardNames = useMemo(() => boards.map((board) => board.name), [boards])
   const canModerate = user && (user.role === 'moderator' || user.role === 'admin')
   const isAdmin = user?.role === 'admin'
 
@@ -171,6 +167,11 @@ function App() {
     setComposerOpen(true)
   }
 
+  const openHot = () => {
+    navigate('/')
+    window.setTimeout(() => document.getElementById('campus-hot')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+  }
+
   const handleReportPost = (post: Post) => setReportTarget({ type: 'post', id: post.id, title: `《${post.title}》` })
   const handleReportComment = (comment: CommentItem) => setReportTarget({ type: 'comment', id: comment.id, title: `${comment.author.nickname}：「${comment.body.slice(0, 40)}」` })
 
@@ -178,8 +179,8 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand" onClick={() => navigate('/')} role="button" tabIndex={0}>
-          <div className="brand-mark"><Sparkles size={17} strokeWidth={2.4} /></div>
-          <div><strong>知行里</strong><span>Campus Commons</span></div>
+          <div className="brand-mark">嘉</div>
+          <div><strong>嘉大圈</strong><span>JXU STUDENT COMMUNITY</span></div>
         </div>
         <div className="top-search">
           <Search size={17} />
@@ -190,7 +191,7 @@ function App() {
               setQuery(event.target.value)
               if (route.tab !== 'home') navigate('/')
             }}
-            placeholder="搜索帖子、板块或标签"
+            placeholder="搜课程、搭子、实习或校园生活"
           />
           <kbd>⌘ K</kbd>
         </div>
@@ -219,7 +220,7 @@ function App() {
           {user ? (
             <div className="verify-card">
               <div className="verify-icon"><ShieldCheck size={18} /></div>
-              <div><strong>{user.verified ? '已完成实名验证' : '待完成验证'}</strong><span>{user.roleLabel}</span></div>
+              <div><strong>{user.verified ? '嘉大学生已认证' : '待完成校园认证'}</strong><span>{user.roleLabel}</span></div>
               <CheckCircle2 size={16} className="verify-check" />
             </div>
           ) : (
@@ -230,14 +231,14 @@ function App() {
             </button>
           )}
           <nav className="main-nav">
-            <NavItem icon={Home} label="社区首页" active={route.tab === 'home' || route.tab === 'post' || route.tab === 'user'} onClick={() => navigate('/')} />
-            <NavItem icon={ClipboardList} label="诉求墙" active={route.tab === 'needs'} onClick={() => navigate('/needs')} />
-            <NavItem icon={MessageCircle} label="站内私信" active={route.tab === 'messages'} badge={messageUnread > 0 ? String(messageUnread) : undefined} onClick={() => navigate('/messages')} />
+            <NavItem icon={Home} label="首页动态" active={route.tab === 'home' || route.tab === 'post' || route.tab === 'user'} onClick={() => navigate('/')} />
+            <NavItem icon={Compass} label="发现热榜" onClick={openHot} />
+            <NavItem icon={MessageCircle} label="同学私信" active={route.tab === 'messages'} badge={messageUnread > 0 ? String(messageUnread) : undefined} onClick={() => navigate('/messages')} />
             {canModerate && <NavItem icon={ShieldCheck} label="内容审核台" active={route.tab === 'moderation'} badge={modPending > 0 ? String(modPending) : undefined} onClick={() => navigate('/moderation')} />}
             {isAdmin && <NavItem icon={Settings2} label="管理后台" active={route.tab === 'admin'} onClick={() => navigate('/admin')} />}
-            <NavItem icon={UserRound} label="个人空间" active={route.tab === 'profile'} badge={unread > 0 ? String(unread) : undefined} onClick={() => navigate('/profile')} />
+            <NavItem icon={UserRound} label="我的主页" active={route.tab === 'profile'} badge={unread > 0 ? String(unread) : undefined} onClick={() => navigate('/profile')} />
           </nav>
-          <div className="sidebar-label">板块</div>
+          <div className="sidebar-label">兴趣板块</div>
           <div className="board-list">
             {boards.map((board) => {
               const Icon = boardIcon(board.icon)
@@ -255,8 +256,8 @@ function App() {
             })}
           </div>
           <div className="sidebar-footer">
-            <div className="safe-note"><LockKeyhole size={15} /><span>社区安全守则</span><ChevronRight size={14} /></div>
-            <p>实名发言 · 前台可匿名<br />每一次表达都值得被尊重</p>
+            <div className="safe-note"><LockKeyhole size={15} /><span>嘉大圈公约</span><ChevronRight size={14} /></div>
+            <p>仅限嘉大学生 · 前台可匿名<br />真实、有用、友善地交流</p>
           </div>
         </aside>
 
@@ -264,10 +265,11 @@ function App() {
           {route.tab === 'home' && (
             <HomeView
               user={user}
-              boards={boardNames}
+              boards={boards}
               activeBoard={activeBoard}
               setActiveBoard={setActiveBoard}
               query={query}
+              onSearch={setQuery}
               refreshKey={feedRefresh}
               onCompose={openComposer}
               navigate={navigate}
@@ -300,7 +302,6 @@ function App() {
               onReport={handleReportPost}
             />
           )}
-          {route.tab === 'needs' && <NeedsView user={user} notify={notify} requireAuth={requireAuth} />}
           {route.tab === 'moderation' && (
             <ModerationView user={user} notify={notify} requireAuth={requireAuth} navigate={navigate} onPendingChange={setModPending} />
           )}
@@ -330,6 +331,14 @@ function App() {
           )}
         </main>
       </div>
+
+      <nav className="mobile-bottom-nav" aria-label="手机端主导航">
+        <button className={route.tab === 'home' || route.tab === 'post' ? 'active' : ''} onClick={() => navigate('/')}><Home size={20} /><span>首页</span></button>
+        <button onClick={openHot}><Compass size={20} /><span>热榜</span></button>
+        <button className="mobile-create" onClick={openComposer} aria-label="发布讨论"><span><Plus size={23} /></span><small>发布</small></button>
+        <button className={route.tab === 'messages' ? 'active' : ''} onClick={() => navigate('/messages')}><MessageCircle size={20} /><span>私信</span>{messageUnread > 0 && <b>{messageUnread}</b>}</button>
+        <button className={route.tab === 'profile' ? 'active' : ''} onClick={() => navigate('/profile')}><UserRound size={20} /><span>我的</span></button>
+      </nav>
 
       {authOpen && (
         <AuthModal

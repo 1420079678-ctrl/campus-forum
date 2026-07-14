@@ -1,173 +1,116 @@
-# 知行里 Campus Commons
+# 嘉大圈 Jiaxing University Student Community
 
-面向大学生、教师与学校职能部门的实名校园社区。学生通过校园邮箱验证、前台可匿名发言；讨论、关注、私信、诉求与治理形成闭环：**校园讨论 → 同学连接 → 学生诉求 → AI 初审 → 人工复核 → 经验沉淀**。
+面向嘉兴大学学生的校园社区。打开首页就是内容流，围绕课程学业、校园生活、实习就业、经验问答、闲置集市和社团活动展开；当前不开放教师、学校部门或领导身份，审核员与管理员只负责平台治理。
 
-技术栈：React 19 + Vite（前端） / Express 5 + better-sqlite3（后端） / 单文件 SQLite 持久化，一条命令即可跑起来，无需外部数据库。
+技术栈：React 19 + Vite（前端） / Express 5 + better-sqlite3（后端） / SQLite 持久化。
 
-## 功能总览
+## 当前能力
 
-**社区讨论**
-- 板块浏览、标签、关键词搜索（`Ctrl/⌘ + K`）、推荐/最新/热门排序、分页加载
-- 校园广场与“我的关注”双信息流，关注感兴趣的同学
-- 图文发帖（最多 4 张）、编辑自己的帖子（编辑后重过 AI 审核并显示"已编辑"）、删除、匿名发布
-- 评论、楼中楼回复、匿名评论、点赞、收藏
-- 点击作者头像/昵称进入其公开主页（匿名内容不暴露身份）
-- 站内私信，避免在公开内容中暴露微信、手机号等个人信息
+- 桌面端左侧导航、中间高密度信息流、右侧嘉大热榜；手机端底部导航与悬浮发布按钮
+- 推荐、关注、最新、热度排序，板块、标签、关键词搜索和分页加载
+- 校园邮箱验证，验证后发帖、评论、图片上传与私信
+- 图文发帖、楼中楼回复、点赞、收藏、关注、公开主页和匿名表达
+- 校园热榜、热门话题、活跃同学和社区数据
+- 规则审核 + 可选 OpenAI-compatible 模型复核、举报、人工审核和审计日志
+- 管理员成员治理与板块管理；审核员只负责内容安全
 
-**诉求墙（学生 → 职能部门）**
-- 向后勤/教务/图书馆等部门提交诉求，可匿名
-- 职能部门账号更新处理进展（受理/处理中/已解决），时间线可视化
-- 关注诉求，进展变更自动通知所有关注者
+## 启动、打开与关闭
 
-**内容安全**
-- 规则式 AI 初审：诈骗话术、代写代考、刷单、引流、隐私泄露等 11 类风险
-- 可选 OpenAI-compatible 真实 LLM 复核；模型不可用时自动降级到本地规则
-- 低风险自动放行；中风险发布并转人工复核；高风险帖进入待复核队列（仅作者可见）
-- 举报流程、审核台（通过/隐藏/驳回）、完整审计日志
-- 审核人员可将优质帖"设为精选"，在推荐流置顶展示
+首次运行先在项目目录安装依赖：
 
-**账号与治理**
-- 五种角色：学生 / 教师 / 职能部门 / 审核员 / 管理员
-- 新注册用户通过校园邮箱验证码完成身份验证；验证后开放发帖、评论、图片和私信
-- 站内通知（评论、点赞、审核结果、诉求进展）
-- 个人空间：资料编辑、修改密码（改密后其他设备强制下线）、我的帖子/收藏
-- 管理后台（仅管理员）：成员搜索、角色调整、封禁/解封（封禁立即踢下线）、板块新建与编辑
-- 登录/发帖/评论接口限流，过期会话自动清理
-
-## 快速开始（本机开发）
-
-```bash
+```powershell
 npm install
-npm run dev:all        # 同时启动 API(8787) 和前端开发服务器(5173)
 ```
 
-打开 `http://127.0.0.1:5173`。前端改动热更新；改了 `server/` 代码需重启。
+开发模式（前端热更新）：
 
-## 生产运行（推荐给正式使用）
-
-```bash
-npm install
-npm run build          # 构建前端到 dist/
-npm start              # API + 前端静态文件都由 8787 端口提供
+```powershell
+npm run dev:all
 ```
 
-打开 `http://127.0.0.1:8787` 即是完整站点。
+浏览器打开 <http://127.0.0.1:5173>。关闭时回到运行命令的终端，按 `Ctrl + C`；如果终端询问是否终止批处理，输入 `Y` 后回车。
 
-### 环境变量
+正式构建后运行：
+
+```powershell
+npm run build
+npm start
+```
+
+浏览器打开 <http://127.0.0.1:8787>。关闭同样按 `Ctrl + C`。
+
+> 开发模式会同时占用 5173 和 8787 端口；正式模式只使用 8787。改动 `server/` 后需重启开发命令。
+
+## 演示账号
+
+首次建库会写入学生社区演示数据：
+
+| 账号 | 密码 | 身份 | 用途 |
+|---|---|---|---|
+| `admin` | `admin123456` | 管理员 | 管理后台、审核台、精选与封禁 |
+| `mod` | `demo123456` | 审核员 | 内容复核与举报处理 |
+| `demo` / `linlin` / `xiaoman` 等 | `demo123456` | 学生 | 日常浏览、发帖与互动 |
+
+正式启用前必须修改管理员密码并处理演示账号。生产模式默认检测常见演示密码并拒绝启动，除非显式设置 `ALLOW_DEMO_CREDENTIALS=true`。
+
+## 配置
+
+复制 `.env.example` 中需要的变量到实际运行环境：
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `API_PORT` | `8787` | 服务端口 |
-| `HOST` | `127.0.0.1` | 监听地址；给别人访问时设为 `0.0.0.0` |
-| `CAMPUS_FORUM_DB` | `./data/campus-forum.db` | SQLite 数据库文件路径 |
+| `HOST` | `127.0.0.1` | 监听地址；局域网访问时设为 `0.0.0.0` |
+| `CAMPUS_FORUM_DB` | `./data/campus-forum.db` | SQLite 数据库路径 |
 | `CAMPUS_FORUM_UPLOADS` | `./data/uploads` | 帖子图片目录 |
-| `CAMPUS_NAME` | `知行大学` | 前台显示的学校名称 |
-| `CAMPUS_EMAIL_DOMAINS` | `edu.cn` | 允许验证的学校邮箱域名，逗号分隔；生产环境应填写精确域名 |
-| `VERIFICATION_WEBHOOK_URL` | 空 | 邮件/短信服务 webhook；开发环境未配置时会返回演示验证码 |
-| `CORS_ALLOWED_ORIGINS` | 空 | 允许的额外跨域来源；同源请求自动允许 |
-| `LLM_MODERATION_URL` | 空 | OpenAI-compatible chat-completions 完整地址 |
-| `LLM_API_KEY` / `LLM_MODEL` | 空 / `gpt-4.1-mini` | 真实模型审核配置 |
+| `CAMPUS_NAME` | `嘉兴大学` | 校园名称 |
+| `CAMPUS_EMAIL_DOMAINS` | `zjxu.edu.cn` | 允许验证的校园邮箱域名 |
+| `VERIFICATION_WEBHOOK_URL` | 空 | 邮件/短信发送 webhook；开发环境未配置时返回演示验证码 |
+| `LLM_MODERATION_URL` | 空 | OpenAI-compatible chat-completions 地址 |
+| `LLM_API_KEY` / `LLM_MODEL` | 空 / `gpt-4.1-mini` | 可选真实模型审核配置 |
 
-## 演示账号
+## 给同学访问
 
-首次启动自动写入种子数据（帖子、诉求、待复核内容都有），方便直接体验全部流程：
+同一校园网或局域网内，可在 PowerShell 运行：
 
-| 账号 | 密码 | 角色 | 用来体验什么 |
-|---|---|---|---|
-| `admin` | `admin123456` | 管理员 | 管理后台、审核台、精选、封禁 |
-| `mod` | `demo123456` | 审核员 | 审核台：待复核帖 + 举报处理 |
-| `houqin` / `jiaowu` / `tushuguan` | `demo123456` | 职能部门 | 诉求墙：更新处理进展 |
-| `teacher_li` | `demo123456` | 教师 | 教师身份发言 |
-| `demo` / `linlin` / `xiaoman` 等 | `demo123456` | 学生 | 日常发帖互动 |
-
-> **正式启用前务必**：用 admin 登录 → 个人空间 → 修改密码；并在管理后台处理演示账号（改密或封禁）。生产模式默认会检测常见演示密码并拒绝启动，除非显式设置 `ALLOW_DEMO_CREDENTIALS=true`。
-
-## 怎么给别人用
-
-### 方案一：同一局域网（宿舍/实验室/校园网，最快）
-
-```bash
+```powershell
 npm run build
-HOST=0.0.0.0 npm start          # Windows PowerShell: $env:HOST='0.0.0.0'; npm start
+$env:HOST='0.0.0.0'; npm start
 ```
 
-查自己的内网 IP（Windows：`ipconfig` 看 IPv4 地址，如 `192.168.1.23`），把 `http://192.168.1.23:8787` 发给同学即可。首次运行 Windows 防火墙弹窗要选"允许"。
+用 `ipconfig` 查看电脑 IPv4 地址，把 `http://你的IP:8787` 发给同学。电脑关机或服务停止后网站会下线。
 
-- 优点：零成本，马上能用
-- 限制：只有同一网络里的人能访问；你的电脑关机就下线
-
-### 方案二：云服务器公网部署（正式使用推荐）
-
-在任意一台 Linux 服务器（阿里云/腾讯云学生机即可，1核1G 足够）：
+公网长期运行建议使用 Linux 云服务器与 HTTPS：
 
 ```bash
-# 服务器上装好 Node.js 20+，然后：
-git clone <你的仓库地址> && cd campus-forum   # 或 scp 上传代码（不含 node_modules）
-npm install && npm run build
-HOST=0.0.0.0 API_PORT=8787 npm start
+npm install
+npm run build
+HOST=0.0.0.0 npm start
 ```
 
-保持后台常驻用 pm2：
-
-```bash
-npm i -g pm2
-HOST=0.0.0.0 pm2 start npm --name campus-forum -- start
-pm2 save && pm2 startup          # 开机自启
-```
-
-然后在安全组/防火墙放行 8787 端口，访问 `http://服务器IP:8787`。
-
-进阶（可选）：套一层 Nginx/Caddy 做域名 + HTTPS，例如 Caddy 一行配置 `你的域名.com { reverse_proxy 127.0.0.1:8787 }` 自动签证书。
-
-### 方案三：Docker（服务器上更省心）
+也可以直接使用 Docker：
 
 ```bash
 docker compose up -d --build
+docker compose down
 ```
 
-即在 8787 端口运行，数据库和上传图片持久化在宿主机 `./data/` 目录。Compose 的默认 `ALLOW_DEMO_CREDENTIALS=true` 只用于快速演示；正式启用时先改密/封禁演示账号，再设为 `false`。国内拉不动基础镜像时，把 Dockerfile 里的 `node:22-bookworm-slim` 换成可信镜像站地址。
+## 数据与检查
 
-### 方案四：内网穿透（临时给校外朋友演示）
+- 数据库位于 `data/campus-forum.db`，上传图片位于 `data/uploads/`
+- 备份前先停止服务，再复制整个 `data/` 目录
+- 重置演示数据：停止服务后删除 `data/`，重新启动
+- 一次运行完整检查：`npm run check`
 
-本机跑起来后用 cloudflared/ngrok 之类工具把 8787 端口映射出去，得到一个临时公网地址。适合演示，不适合长期使用。
-
-## 数据管理
-
-- **备份**：整站数据就是 `data/campus-forum.db` 一个文件（连同 `-wal`/`-shm`），停止服务后复制走即可
-- **重置**：停止服务，删除 `data/` 目录下所有文件，重启后自动重建并写入种子数据
-- **不要种子数据**：目前种子随首次建库写入；正式启用后在管理后台封禁演示账号即可（帖子可由审核隐藏）
-
-## 构建与检查
-
-```bash
-npm run build     # 类型检查 + 前端构建
-npm run lint      # oxlint
-npm run test      # 规则审核 + 隔离数据库 API 集成测试
-npm run check     # lint + test + build，一次完成 CI 同款检查
+```text
+server/   Express API、业务、数据库与审核
+src/      React 页面与组件
+tests/    API 集成测试和内容安全测试
+docs/     PostgreSQL 迁移与社区规模路线
 ```
 
-## 目录结构
+## 能做到什么程度
 
-```
-server/          Express API（index.ts 路由 / store.ts 业务 / db.ts 建库与种子 / auth.ts 会话 / moderate.ts AI 规则）
-src/             React 前端（views/ 五个页面 + components/ 弹窗组件）
-data/            SQLite 数据库（运行时生成，勿提交）
-dist/            前端构建产物（npm run build 生成）
-tests/           规则与 API 集成测试
-docs/            PostgreSQL 迁移与社区规模路线
-```
+当前版本已经达到可内测的单校垂直社区形态：信息流、热榜、互动、私信、身份验证、内容治理和后台均可闭环。体验上可以继续向 NodeLoc 的论坛氛围和知乎/贴吧的内容消费效率靠近，但用户规模不是只靠前端就能获得的。
 
-## 角色权限速查
-
-| 能力 | 学生 | 教师 | 职能部门 | 审核员 | 管理员 |
-|---|---|---|---|---|---|
-| 发帖/评论/点赞/收藏/举报 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 提交诉求 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 更新诉求进展 | | | ✓ | | ✓ |
-| 审核台（复核/举报处理） | | | | ✓ | ✓ |
-| 设为精选 | | | | ✓ | ✓ |
-| 管理后台（角色/封禁/板块） | | | | | ✓ |
-
-## 规模化路线
-
-图片、私信、校园邮箱验证和真实 LLM 审核接口已经落地。单校内测仍推荐 SQLite；多实例和多校扩展前，按 [PostgreSQL 迁移路径](docs/postgresql-migration.md) 拆分异步数据层并引入 PostgreSQL、Redis、对象存储和全文检索。更完整的产品与规模阶段见 [大学生垂直社区路线](docs/community-scale-roadmap.md)。AI 只做风险判断与建议，删除与封禁始终保留人工决定。
+建议先用 100–500 名嘉大学生验证发帖率、次日留存、优质内容供给和举报处理，再逐步加入话题关注、课程/专业知识库、活动报名、闲置交易信用与推荐算法。多实例或多校扩展前，再迁移 PostgreSQL、Redis、对象存储和全文检索。详见 [大学生垂直社区路线](docs/community-scale-roadmap.md) 与 [PostgreSQL 迁移路径](docs/postgresql-migration.md)。

@@ -61,7 +61,7 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
         <div className="empty-state">
           <UserRound size={26} />
           <h3>登录后查看你的个人空间</h3>
-          <p>发帖记录、收藏、诉求和社区贡献都会在这里沉淀。</p>
+          <p>发帖记录、收藏、关注和社区贡献都会在这里沉淀。</p>
           <button className="primary-button" onClick={() => requireAuth()}>登录 / 注册</button>
         </div>
       </div>
@@ -153,7 +153,7 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
         <div>
           <span className="verified-label"><ShieldCheck size={14} />{user.verified ? '已验证成员' : '未验证'} · {user.roleLabel}</span>
           <h1>{user.nickname}</h1>
-          <p>{[user.grade, user.dept].filter(Boolean).join(' · ') || '资料待完善'} · 加入知行里 {stats?.joinedDays ?? 0} 天</p>
+          <p>{[user.grade, user.dept].filter(Boolean).join(' · ') || '资料待完善'} · 加入嘉大圈 {stats?.joinedDays ?? 0} 天</p>
           {user.bio && <p className="profile-bio">{user.bio}</p>}
         </div>
         <div className="profile-hero-actions">
@@ -189,7 +189,7 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
           <div className="impact-row secondary">
             <div><strong>{stats?.comments ?? 0}</strong><span>参与回复</span></div>
             <div><strong>{stats?.favorites ?? 0}</strong><span>收藏内容</span></div>
-            <div><strong>{stats?.needs ?? 0}</strong><span>发起诉求</span></div>
+            <div><strong>{stats?.followers ?? 0}</strong><span>关注我的</span></div>
           </div>
         </div>
         <div className="profile-panel security-panel">

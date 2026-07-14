@@ -42,26 +42,86 @@ function authorFor(row: AuthorRow, viewer: Viewer) {
 export function listBoards() {
   return db.prepare(`
     SELECT b.id, b.name, b.description, b.icon, b.color,
-      (SELECT COUNT(*) FROM posts p WHERE p.board_id = b.id AND p.status = 'visible') as postCount
+      (SELECT COUNT(*) FROM posts p JOIN users pu ON pu.id = p.user_id
+        WHERE p.board_id = b.id AND p.status = 'visible' AND pu.role = 'student' AND pu.status = 'active') as postCount
     FROM boards b ORDER BY b.sort
   `).all()
 }
 
 export function communityStats() {
-  const members = (db.prepare("SELECT COUNT(*) as c FROM users WHERE status = 'active'").get() as { c: number }).c
-  const weekPosts = (db.prepare("SELECT COUNT(*) as c FROM posts WHERE created_at >= datetime('now', '-7 days') AND status != 'deleted'").get() as { c: number }).c
-  const weekComments = (db.prepare("SELECT COUNT(*) as c FROM comments WHERE created_at >= datetime('now', '-7 days') AND status = 'visible'").get() as { c: number }).c
+  const members = (db.prepare("SELECT COUNT(*) as c FROM users WHERE status = 'active' AND role = 'student'").get() as { c: number }).c
+  const weekPosts = (db.prepare("SELECT COUNT(*) as c FROM posts p JOIN users u ON u.id = p.user_id WHERE p.created_at >= datetime('now', '-7 days') AND p.status = 'visible' AND u.role = 'student'").get() as { c: number }).c
+  const weekComments = (db.prepare("SELECT COUNT(*) as c FROM comments c JOIN users u ON u.id = c.user_id WHERE c.created_at >= datetime('now', '-7 days') AND c.status = 'visible' AND u.role = 'student'").get() as { c: number }).c
   const needsTotal = (db.prepare('SELECT COUNT(*) as c FROM needs').get() as { c: number }).c
   const needsAnswered = (db.prepare('SELECT COUNT(DISTINCT need_id) as c FROM need_updates').get() as { c: number }).c
   const knowledge = (db.prepare(`
     SELECT COUNT(*) as c FROM posts p JOIN boards b ON b.id = p.board_id
-    WHERE p.status = 'visible' AND (p.featured = 1 OR b.name IN ('升学就业', '学长学姐'))
+    WHERE p.status = 'visible' AND (p.featured = 1 OR b.name IN ('实习就业', '经验问答'))
   `).get() as { c: number }).c
   return {
     members,
     weekDiscussions: weekPosts + weekComments,
     needResponseRate: needsTotal === 0 ? 100 : Math.round((needsAnswered / needsTotal) * 100),
     knowledgeCount: knowledge,
+  }
+}
+
+export function communityPulse() {
+  const tagRows = db.prepare(`
+    SELECT p.tags, p.like_count as likes, p.comment_count as comments
+    FROM posts p JOIN users u ON u.id = p.user_id
+    WHERE p.status = 'visible' AND u.role = 'student' AND u.status = 'active'
+    ORDER BY p.id DESC LIMIT 100
+  `).all() as Array<{ tags: string; likes: number; comments: number }>
+  const tagScores = new Map<string, { count: number; score: number }>()
+  for (const row of tagRows) {
+    for (const tag of JSON.parse(row.tags || '[]') as string[]) {
+      const current = tagScores.get(tag) ?? { count: 0, score: 0 }
+      current.count += 1
+      current.score += 1 + row.likes * 2 + row.comments * 3
+      tagScores.set(tag, current)
+    }
+  }
+  const trendingTags = [...tagScores.entries()]
+    .sort((a, b) => b[1].score - a[1].score)
+    .slice(0, 8)
+    .map(([name, value], index) => ({ name, count: value.count, rank: index + 1 }))
+
+  const hotPosts = db.prepare(`
+    SELECT p.id, p.title, b.name as board,
+      p.like_count as likeCount, p.comment_count as commentCount,
+      (p.like_count * 3 + p.comment_count * 5 + p.view_count / 20.0) as heat
+    FROM posts p JOIN boards b ON b.id = p.board_id JOIN users u ON u.id = p.user_id
+    WHERE p.status = 'visible' AND u.role = 'student' AND u.status = 'active'
+    ORDER BY heat DESC, p.id DESC LIMIT 5
+  `).all()
+
+  const activeStudents = db.prepare(`
+    SELECT u.id, u.nickname, u.grade, u.dept,
+      (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id AND p.status = 'visible') as posts,
+      (SELECT COUNT(*) FROM comments c WHERE c.user_id = u.id AND c.status = 'visible') as comments,
+      (SELECT COALESCE(SUM(p.like_count), 0) FROM posts p WHERE p.user_id = u.id AND p.status = 'visible') as likes
+    FROM users u WHERE u.role = 'student' AND u.status = 'active'
+    ORDER BY (posts * 4 + comments * 2 + likes) DESC, u.id DESC LIMIT 5
+  `).all() as any[]
+
+  const onlineNow = (db.prepare(`
+    SELECT COUNT(DISTINCT s.user_id) as c FROM sessions s JOIN users u ON u.id = s.user_id
+    WHERE s.expires_at > datetime('now') AND u.role = 'student' AND u.status = 'active'
+  `).get() as { c: number }).c
+
+  return {
+    campus: process.env.CAMPUS_NAME?.trim() || '嘉兴大学',
+    onlineNow,
+    trendingTags,
+    hotPosts,
+    activeStudents: activeStudents.map((row) => ({
+      id: row.id,
+      nickname: row.nickname,
+      avatar: String(row.nickname).slice(0, 1),
+      roleLabel: roleLabel(row),
+      contribution: Number(row.posts) + Number(row.comments),
+    })),
   }
 }
 
@@ -118,7 +178,7 @@ export type PostQuery = {
 }
 
 export function listPosts(query: PostQuery, viewer: Viewer) {
-  const where: string[] = []
+  const where: string[] = ["u.role IN ('student','moderator','admin') AND u.status = 'active'"]
   const params: Record<string, unknown> = { viewerId: viewer?.id ?? 0 }
   if (query.authorId) {
     where.push("p.user_id = @authorId AND p.status != 'deleted'")
@@ -616,7 +676,7 @@ export function publicProfile(userId: number, viewer: Viewer = null) {
   const row = db.prepare(`
     SELECT id, nickname, role, dept, grade, bio, campus, verified, status, ${ISO('created_at')} as createdAt,
       CAST(julianday('now') - julianday(created_at) AS INTEGER) as joinedDays
-    FROM users WHERE id = ?
+    FROM users WHERE id = ? AND role IN ('student','moderator','admin')
   `).get(userId) as any
   if (!row || row.status !== 'active') throw new HttpError(404, '用户不存在或已注销')
   const posts = (db.prepare("SELECT COUNT(*) as c FROM posts WHERE user_id = ? AND status = 'visible' AND anonymous = 0").get(userId) as { c: number }).c
@@ -669,7 +729,7 @@ function directPair(a: number, b: number) {
 
 function ensureDirectConversation(viewerId: number, otherId: number) {
   if (viewerId === otherId) throw new HttpError(400, '不能给自己发私信')
-  const target = db.prepare("SELECT id, nickname, role, dept, grade, status FROM users WHERE id = ? AND status = 'active'").get(otherId) as any
+  const target = db.prepare("SELECT id, nickname, role, dept, grade, status FROM users WHERE id = ? AND status = 'active' AND role IN ('student','moderator','admin')").get(otherId) as any
   if (!target) throw new HttpError(404, '用户不存在')
   const [low, high] = directPair(viewerId, otherId)
   db.prepare('INSERT OR IGNORE INTO direct_conversations (user_low_id, user_high_id) VALUES (?, ?)').run(low, high)
@@ -687,7 +747,7 @@ export function listDirectConversations(viewer: SessionUser) {
       (SELECT COUNT(*) FROM direct_messages um WHERE um.conversation_id = c.id AND um.sender_id != @viewerId AND um.read_at IS NULL) as unread
     FROM direct_conversations c
     JOIN users u ON u.id = CASE WHEN c.user_low_id = @viewerId THEN c.user_high_id ELSE c.user_low_id END
-    WHERE (c.user_low_id = @viewerId OR c.user_high_id = @viewerId) AND u.status = 'active'
+    WHERE (c.user_low_id = @viewerId OR c.user_high_id = @viewerId) AND u.status = 'active' AND u.role IN ('student','moderator','admin')
       AND EXISTS (SELECT 1 FROM direct_messages em WHERE em.conversation_id = c.id)
     ORDER BY COALESCE(updatedAt, c.updated_at) DESC
   `).all({ viewerId: viewer.id }) as any[]
@@ -732,7 +792,9 @@ export function directUnreadCount(viewer: SessionUser) {
 // ---------- admin ----------
 
 export function adminListUsers(q?: string) {
-  const where = q ? 'WHERE u.username LIKE @q OR u.nickname LIKE @q' : ''
+  const where = q
+    ? "WHERE u.role IN ('student','moderator','admin') AND (u.username LIKE @q OR u.nickname LIKE @q)"
+    : "WHERE u.role IN ('student','moderator','admin')"
   return db.prepare(`
     SELECT u.id, u.username, u.nickname, u.role, u.dept, u.grade, u.status, ${ISO('u.created_at')} as createdAt,
       (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id AND p.status != 'deleted') as postCount,
@@ -742,7 +804,7 @@ export function adminListUsers(q?: string) {
   `).all(q ? { q: `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%` } : {})
 }
 
-const ASSIGNABLE_ROLES = ['student', 'teacher', 'staff', 'moderator', 'admin']
+const ASSIGNABLE_ROLES = ['student', 'moderator', 'admin']
 
 export function adminUpdateUser(viewer: SessionUser, userId: number, input: { role?: string; status?: string }) {
   const target = db.prepare('SELECT id, username, nickname, role, status FROM users WHERE id = ?').get(userId) as any

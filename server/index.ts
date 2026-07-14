@@ -9,7 +9,7 @@ import {
 } from './auth.js'
 import {
   DEPARTMENTS, HttpError, REPORT_REASONS, addNeedUpdate, adminListUsers, adminSaveBoard, adminUpdateUser,
-  communityStats, createComment, createNeed, createPost, createReport, deleteComment, deletePost, getPost,
+  communityPulse, communityStats, createComment, createNeed, createPost, createReport, deleteComment, deletePost, getPost,
   directUnreadCount, getDirectThread, handleReport, listAuditLogs, listBoards, listComments, listDirectConversations, listNeeds, listNotifications, listPosts,
   markNotificationsRead, moderatePost, moderationOverview, myStats, publicProfile, roleLabel, setFeatured,
   sendDirectMessage, toggleFavorite, toggleFollowNeed, toggleLike, toggleUserFollow, updatePost, updateProfile,
@@ -209,6 +209,7 @@ app.post('/api/users/:id/follow', requireAuth, requireVerified, wrap((req, res) 
 
 app.get('/api/boards', wrap((_req, res) => res.json({ data: listBoards() })))
 app.get('/api/stats', wrap((_req, res) => res.json({ data: communityStats() })))
+app.get('/api/pulse', wrap((_req, res) => res.json({ data: communityPulse() })))
 app.get('/api/meta', wrap((_req, res) => res.json({ departments: DEPARTMENTS, reportReasons: REPORT_REASONS, ...campusVerificationMeta() })))
 
 // ---------- posts ----------

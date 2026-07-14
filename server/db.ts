@@ -10,7 +10,7 @@ export const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 const currentVersion = db.pragma('user_version', { simple: true }) as number
 
 if (currentVersion < 2) {
@@ -61,6 +61,30 @@ if (currentVersion < 4) {
       attempts INTEGER NOT NULL DEFAULT 0,
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `)
+}
+if (currentVersion < 5) {
+  db.exec(`
+    UPDATE users SET campus = '嘉兴大学' WHERE campus = '' OR campus = '知行大学';
+    UPDATE users SET nickname = '嘉大圈运营', dept = '社区运营', bio = '维护社区秩序与产品规则。' WHERE username = 'admin';
+    UPDATE users SET nickname = '社区安全员', dept = '社区运营', bio = '处理举报与内容安全复核。' WHERE username = 'mod';
+    UPDATE users SET nickname = '嘉大同学', bio = '在嘉大圈记录我的大学生活。' WHERE username = 'demo';
+
+    UPDATE posts SET status = 'hidden'
+      WHERE user_id IN (SELECT id FROM users WHERE role IN ('teacher', 'staff')) AND status != 'deleted';
+    UPDATE comments SET status = 'hidden'
+      WHERE user_id IN (SELECT id FROM users WHERE role IN ('teacher', 'staff')) AND status != 'deleted';
+    UPDATE users SET status = 'banned'
+      WHERE role IN ('teacher', 'staff') AND username IN ('houqin', 'jiaowu', 'tushuguan', 'teacher_li');
+
+    UPDATE boards SET name = '课程学业', description = '课程、考试、竞赛和学习方法' WHERE name = '学习交流';
+    UPDATE boards SET name = '实习就业', description = '实习、求职、考研与职业经验' WHERE name = '升学就业';
+    UPDATE boards SET name = '经验问答', description = '选课避坑、校园经验与新生指南' WHERE name = '学长学姐';
+    UPDATE boards SET name = '闲置集市', description = '校内闲置转让与好物交换' WHERE name = '二手集市';
+
+    UPDATE posts SET comment_count = (
+      SELECT COUNT(*) FROM comments c WHERE c.post_id = posts.id AND c.status = 'visible'
     );
   `)
 }
@@ -273,8 +297,8 @@ function seed() {
     const demoPassword = hashPassword('demo123456')
     const users: Record<string, number> = {}
     const userSeeds = [
-      { username: 'admin', passwordHash: hashPassword('admin123456'), nickname: '陈老师', role: 'admin', dept: '学生工作部', grade: '', bio: '社区管理员，负责平台治理与规则维护。', age: '-190 days' },
-      { username: 'mod', passwordHash: demoPassword, nickname: '审核员小杨', role: 'moderator', dept: '社区运营中心', grade: '', bio: '人工复核 AI 标记的内容，守护社区安全。', age: '-180 days' },
+      { username: 'admin', passwordHash: hashPassword('admin123456'), nickname: '嘉大圈运营', role: 'admin', dept: '社区运营', grade: '', bio: '维护社区秩序与产品规则。', age: '-190 days' },
+      { username: 'mod', passwordHash: demoPassword, nickname: '社区安全员', role: 'moderator', dept: '社区运营', grade: '', bio: '处理举报与内容安全复核。', age: '-180 days' },
       { username: 'houqin', passwordHash: demoPassword, nickname: '后勤服务中心', role: 'staff', dept: '后勤服务中心', grade: '', bio: '受理宿舍、食堂、校园设施相关诉求。', age: '-175 days' },
       { username: 'jiaowu', passwordHash: demoPassword, nickname: '教务处', role: 'staff', dept: '教务处', grade: '', bio: '受理选课、考试、教学安排相关诉求。', age: '-175 days' },
       { username: 'tushuguan', passwordHash: demoPassword, nickname: '图书馆', role: 'staff', dept: '图书馆', grade: '', bio: '受理图书馆资源与环境相关诉求。', age: '-170 days' },
@@ -284,7 +308,7 @@ function seed() {
       { username: 'buaoye', passwordHash: demoPassword, nickname: '学长不熬夜', role: 'student', dept: '商学院', grade: '研二', bio: '分享求职与实习经验，拒绝无效内卷。', age: '-140 days' },
       { username: 'zhou', passwordHash: demoPassword, nickname: '周同学', role: 'student', dept: '机械学院', grade: '大二', bio: '', age: '-120 days' },
       { username: 'wang', passwordHash: demoPassword, nickname: '王学姐', role: 'student', dept: '新闻学院', grade: '大四', bio: '毕业倒计时，把经验都留下。', age: '-130 days' },
-      { username: 'demo', passwordHash: demoPassword, nickname: '知行同学', role: 'student', dept: '经济学院', grade: '大二', bio: '在知行里记录我的大学生活。', age: '-128 days' },
+      { username: 'demo', passwordHash: demoPassword, nickname: '嘉大同学', role: 'student', dept: '经济学院', grade: '大二', bio: '在嘉大圈记录我的大学生活。', age: '-128 days' },
     ]
     for (const u of userSeeds) {
       const result = insertUser.run({ ...u })
@@ -293,11 +317,11 @@ function seed() {
 
     const boards: Record<string, number> = {}
     const boardSeeds = [
-      ['学习交流', '课程、考试、论文和学习方法', 'BookOpen', 'coral'],
+      ['课程学业', '课程、考试、竞赛和学习方法', 'BookOpen', 'coral'],
       ['校园生活', '宿舍、食堂、出行与校园服务', 'Home', 'mint'],
-      ['升学就业', '考研、实习、求职与职业经验', 'TrendingUp', 'gold'],
-      ['学长学姐', '经验传承与新生指南', 'GraduationCap', 'lavender'],
-      ['二手集市', '闲置转让、好物交换', 'ShoppingBag', 'sky'],
+      ['实习就业', '实习、求职、考研与职业经验', 'TrendingUp', 'gold'],
+      ['经验问答', '选课避坑、校园经验与新生指南', 'GraduationCap', 'lavender'],
+      ['闲置集市', '校内闲置转让与好物交换', 'ShoppingBag', 'sky'],
       ['社团活动', '社团招新与活动组织', 'Users', 'rose'],
     ] as const
     boardSeeds.forEach(([name, description, icon, color], index) => {
@@ -306,18 +330,18 @@ function seed() {
     })
 
     const postSeeds = [
-      { user: 'linlin', board: '学习交流', title: '有没有人一起准备下周的数据库期末？', body: '老师给的复习范围有点大，想找几位同学组个线上自习小组，互相讲讲不会的题。已经整理了一份复习清单，涵盖关系代数、范式、索引和事务四大块，欢迎一起补充。计划每晚八点半语音对题，坚持到考前。', tags: ['数据库', '期末复习'], featured: 1, viewCount: 486, age: '-26 hours' },
-      { user: 'xiaoman', board: '校园生活', title: '南区宿舍热水供应时间有调整吗？', body: '最近晚上十点半之后经常没有热水，想确认一下是临时维修还是新的供应时间。已经在后勤小程序提交过一次反馈，也在诉求区发起了跟踪，有同样情况的同学可以关注一下。', tags: ['宿舍', '校园服务'], viewCount: 322, age: '-22 hours' },
-      { user: 'buaoye', board: '升学就业', title: '分享一份真实的暑期实习准备路线（含时间表）', body: '从三月开始准备到拿到 offer，中间踩了不少坑。把简历、笔试、面试和复盘过程整理成了一份时间表：三月改简历+投递，四月集中笔试，五月三轮面试，六月等结果补投。最大的教训是：不要等"准备好了"再投，边投边补才是常态。', tags: ['实习', '经验分享'], featured: 1, viewCount: 918, age: '-2 days' },
-      { user: 'wang', board: '学长学姐', title: '给新生的选课避坑指南（文科版）', body: '大四老学姐的血泪经验：1) 通识课先看往年评价再选，别只看名字浪漫；2) 早八连排两节的课慎选，出勤率就是绩点；3) 期末论文型课程要提前问清查重要求；4) 跨学院选课名额很紧张，开放当晚蹲点才抢得到。祝学弟学妹们绩点长虹。', tags: ['选课', '新生指南'], viewCount: 754, age: '-3 days' },
-      { user: 'teacher_li', board: '学习交流', title: '《操作系统》期末答疑安排（本周三、周五晚）', body: '同学们好，期末答疑定在本周三、周五晚上 7:00-9:00，实验楼 B404。进程调度和内存管理是历年失分重点，建议带着具体题目来。不能到场的同学可以在这个帖子下留言，我会统一回复。', tags: ['操作系统', '答疑'], featured: 0, viewCount: 407, age: '-30 hours' },
-      { user: 'zhou', board: '二手集市', title: '出一辆九成新通勤自行车，毕业学长托卖', body: '车况很好，变速正常，刹车灵敏，平时就宿舍到教学楼骑。原价 680，现在 260 出，送车锁和打气筒。想看车的同学可以在评论区约时间，工作日下午都在。', tags: ['二手', '自行车'], viewCount: 189, age: '-8 hours' },
+      { user: 'linlin', board: '课程学业', title: '有没有人一起准备下周的数据库期末？', body: '老师给的复习范围有点大，想找几位同学组个线上自习小组，互相讲讲不会的题。已经整理了一份复习清单，涵盖关系代数、范式、索引和事务四大块，欢迎一起补充。计划每晚八点半语音对题，坚持到考前。', tags: ['数据库', '期末复习'], featured: 1, viewCount: 486, age: '-26 hours' },
+      { user: 'xiaoman', board: '校园生活', title: '南区宿舍热水供应时间有调整吗？', body: '最近晚上十点半之后经常没有热水，想确认一下是临时维修还是新的供应时间。已经在校园服务小程序提交过一次反馈，有同样情况的同学可以在评论区互相同步消息。', tags: ['宿舍', '校园服务'], viewCount: 322, age: '-22 hours' },
+      { user: 'buaoye', board: '实习就业', title: '分享一份真实的暑期实习准备路线（含时间表）', body: '从三月开始准备到拿到 offer，中间踩了不少坑。把简历、笔试、面试和复盘过程整理成了一份时间表：三月改简历+投递，四月集中笔试，五月三轮面试，六月等结果补投。最大的教训是：不要等"准备好了"再投，边投边补才是常态。', tags: ['实习', '经验分享'], featured: 1, viewCount: 918, age: '-2 days' },
+      { user: 'wang', board: '经验问答', title: '给新生的选课避坑指南（文科版）', body: '大四老学姐的血泪经验：1) 通识课先看往年评价再选，别只看名字浪漫；2) 早八连排两节的课慎选，出勤率就是绩点；3) 期末论文型课程要提前问清查重要求；4) 跨学院选课名额很紧张，开放当晚蹲点才抢得到。祝学弟学妹们绩点长虹。', tags: ['选课', '新生指南'], viewCount: 754, age: '-3 days' },
+      { user: 'teacher_li', board: '课程学业', title: '《操作系统》期末答疑安排（本周三、周五晚）', body: '同学们好，期末答疑定在本周三、周五晚上 7:00-9:00，实验楼 B404。进程调度和内存管理是历年失分重点，建议带着具体题目来。不能到场的同学可以在这个帖子下留言，我会统一回复。', tags: ['操作系统', '答疑'], featured: 0, viewCount: 407, age: '-30 hours' },
+      { user: 'zhou', board: '闲置集市', title: '出一辆九成新通勤自行车，毕业学长托卖', body: '车况很好，变速正常，刹车灵敏，平时就宿舍到教学楼骑。原价 680，现在 260 出，送车锁和打气筒。想看车的同学可以在评论区约时间，工作日下午都在。', tags: ['二手', '自行车'], viewCount: 189, age: '-8 hours' },
       { user: 'demo', board: '社团活动', title: '摄影社秋季纳新：不需要相机，只需要好奇心', body: '摄影社开始纳新啦！不要求有设备，手机拍照也完全欢迎。我们每两周组织一次外拍，学校承担交通费，期末还有社内影展。上学期最受欢迎的活动是夜爬拍星轨。报名方式见社团招新墙，或在评论区留言。', tags: ['社团', '纳新', '摄影'], viewCount: 268, age: '-11 hours' },
-      { user: 'linlin', board: '学习交流', title: '大二下开始学后端，Java 和 Go 怎么选？', body: '目前只学过 C 和一点 Python，想在暑假系统学一门后端语言。看招聘软件 Java 岗位多但卷，Go 岗位少但新项目多。有没有学长学姐能从课程衔接和找实习两个角度给点建议？', tags: ['后端', '技术选型'], viewCount: 231, age: '-6 hours' },
+      { user: 'linlin', board: '课程学业', title: '大二下开始学后端，Java 和 Go 怎么选？', body: '目前只学过 C 和一点 Python，想在暑假系统学一门后端语言。看招聘软件 Java 岗位多但卷，Go 岗位少但新项目多。有没有学长学姐能从课程衔接和找实习两个角度给点建议？', tags: ['后端', '技术选型'], viewCount: 231, age: '-6 hours' },
       { user: 'xiaoman', board: '校园生活', title: '图书馆四楼自习区占座现象太严重了', body: '早上八点去四楼，一半座位放着书但人不在，一直到中午都没人。建议大家文明自习，也想问问图书馆有没有类似"离座超时清桌"的规则？如果有，希望能严格执行。', tags: ['图书馆', '自习'], viewCount: 356, age: '-5 hours' },
-      { user: 'demo', board: '升学就业', title: '大二要不要开始准备考研？想听听过来人的想法', body: '身边已经有同学开始背单词、看数学基础课了。我的困惑是：现在开始会不会战线太长后期乏力？还是说大二先把绩点和英语基础打好，大三再全力冲刺？希望听到不同选择的真实经历。', tags: ['考研', '规划'], viewCount: 298, age: '-4 hours' },
+      { user: 'demo', board: '实习就业', title: '大二要不要开始准备考研？想听听过来人的想法', body: '身边已经有同学开始背单词、看数学基础课了。我的困惑是：现在开始会不会战线太长后期乏力？还是说大二先把绩点和英语基础打好，大三再全力冲刺？希望听到不同选择的真实经历。', tags: ['考研', '规划'], viewCount: 298, age: '-4 hours' },
       { user: 'wang', board: '校园生活', title: '食堂三楼新开的麻辣香锅窗口真的可以', body: '昨天试了三楼新窗口，分量实在，两个人点了 38 块钱吃到扶墙。辣度可以选微辣，不能吃辣的同学也友好。唯一缺点是高峰期排队有点长，建议错峰 11:20 前到。', tags: ['食堂', '美食'], viewCount: 412, age: '-27 hours' },
-      { user: 'zhou', board: '二手集市', title: '低价出全新考研英语资料，先到先得', body: '全新考研英语真题卷，买重复了低价出。有意向的加我微信 zk20260521 私聊，可以先转账定金帮你留着，宿舍楼下自取。', tags: ['二手', '考研资料'], status: 'pending', riskLevel: 'high', riskReasons: ['疑似诈骗话术（转账/汇款/押金 + 私下联系）', '引导添加校外联系方式'], viewCount: 0, age: '-35 minutes' },
+      { user: 'zhou', board: '闲置集市', title: '低价出全新考研英语资料，先到先得', body: '全新考研英语真题卷，买重复了低价出。有意向的加我微信 zk20260521 私聊，可以先转账定金帮你留着，宿舍楼下自取。', tags: ['二手', '考研资料'], status: 'pending', riskLevel: 'high', riskReasons: ['疑似诈骗话术（转账/汇款/押金 + 私下联系）', '引导添加校外联系方式'], viewCount: 0, age: '-35 minutes' },
     ]
     const postIds: number[] = []
     for (const p of postSeeds) {
@@ -447,7 +471,7 @@ function seed() {
 
     insertNotification.run(users['demo'], 'comment', users['buaoye'], 'post', postIds[9], '学长不熬夜 评论了你的帖子《大二要不要开始准备考研？想听听过来人的想法》', '-3 hours')
     insertNotification.run(users['demo'], 'like', users['xiaoman'], 'post', postIds[9], '小满 赞了你的帖子《大二要不要开始准备考研？想听听过来人的想法》', '-2 hours')
-    insertNotification.run(users['demo'], 'system', null, null, null, '欢迎加入知行里。实名信息仅用于安全验证，前台展示昵称，发言请遵守社区公约。', '-128 days')
+    insertNotification.run(users['demo'], 'system', null, null, null, '欢迎加入嘉大圈。实名信息仅用于安全验证，前台展示昵称，发言请遵守社区公约。', '-128 days')
 
     insertAudit.run('ai', 'ai-guard-01', 'FLAG_PENDING', 'post', postIds[11], 'AI 初审判定高风险：疑似诈骗话术（转账/汇款/押金 + 私下联系）', '-35 minutes')
     insertAudit.run('ai', 'ai-guard-01', 'AUTO_PASS', 'post', postIds[10], 'AI 初审判定低风险，自动放行', '-27 hours')
