@@ -7,6 +7,7 @@ import { boardIcon } from '../boardMeta'
 import { timeAgo } from '../format'
 import type { AdminUser, Board, Me } from '../types'
 import { ROLE_LABEL } from '../types'
+import { avatarStyle } from '../avatar'
 
 const BOARD_COLORS = ['coral', 'mint', 'gold', 'lavender', 'sky', 'rose']
 const ACTIVE_ROLES: Me['role'][] = ['student', 'moderator', 'admin']
@@ -109,7 +110,7 @@ export default function AdminView({ user, notify, requireAuth, navigate, onBoard
       <div className="admin-user-list">
         {filtered.map((item) => (
           <div className={`admin-user-row ${item.status === 'banned' ? 'banned' : ''}`} key={item.id}>
-            <span className="avatar small">{item.nickname.slice(0, 1)}</span>
+            <span className="avatar small" style={avatarStyle(item.id)}>{item.nickname.slice(0, 1)}</span>
             <div className="admin-user-main">
               <strong>
                 <button className="author-link" onClick={() => navigate(`/user/${item.id}`)}>{item.nickname}</button>

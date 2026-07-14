@@ -10,6 +10,7 @@ import StickerPicker, { CommentBody, StickerCard } from '../components/StickerPi
 import { commentPreview, stickerToken, type StickerId } from '../stickers'
 import type { Board, CommentItem, Me, Post } from '../types'
 import { RISK_LABEL } from '../types'
+import { avatarStyle } from '../avatar'
 
 export default function PostDetailView({ id, user, boards, navigate, notify, requireAuth, onReport, onReportComment, onDeleted, onChanged }: {
   id: number
@@ -177,7 +178,7 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
       )}
       <article className="post-card detail-card">
         <div className="post-meta">
-          <span className="avatar">{post.author.avatar}</span>
+          <span className="avatar" style={avatarStyle(post.author.id ?? post.author.nickname)}>{post.author.avatar}</span>
           <div>
             <strong>
               {post.author.id
@@ -221,7 +222,7 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
         {comments.map((comment) => (
           <div key={comment.id} className={`comment-item ${comment.parentId ? 'nested' : ''}`}>
             {comment.parentId && <CornerDownRight size={14} className="nest-mark" />}
-            <span className="avatar small">{comment.author.avatar}</span>
+            <span className="avatar small" style={avatarStyle(comment.author.id ?? comment.author.nickname)}>{comment.author.avatar}</span>
             <div className="comment-main">
               <div className="comment-head">
                 <strong>
@@ -257,7 +258,7 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
         {user ? (
           <>
             <div className="comment-input-row">
-              <span className="avatar small">{user.avatar}</span>
+              <span className="avatar small" style={avatarStyle(user.id)}>{user.avatar}</span>
               <textarea
                 id="comment-input"
                 value={body}

@@ -10,6 +10,7 @@ export type SessionUser = {
   id: number
   username: string
   nickname: string
+  avatar: string
   role: Role
   dept: string
   grade: string
@@ -36,7 +37,7 @@ export function destroySession(token: string) {
 export function userFromToken(token: string | undefined): SessionUser | null {
   if (!token) return null
   const row = db.prepare(`
-    SELECT u.id, u.username, u.nickname, u.role, u.dept, u.grade, u.bio, u.verified,
+    SELECT u.id, u.username, u.nickname, u.avatar, u.role, u.dept, u.grade, u.bio, u.verified,
       u.campus, u.email, u.verification_status as verificationStatus, u.created_at as createdAt
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token = ? AND s.expires_at > datetime('now') AND u.status = 'active'

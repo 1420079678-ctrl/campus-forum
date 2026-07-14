@@ -72,6 +72,10 @@ test('verified student can publish, follow and message', async () => {
   assert.equal(registered.data.user.verified, false)
   const token = registered.data.token as string
 
+  const avatarUpdated = await request('/api/me', { method: 'PATCH', token, body: { avatar: '🎧' } })
+  assert.equal(avatarUpdated.status, 200)
+  assert.equal(avatarUpdated.data.user.avatar, '🎧')
+
   const blocked = await request('/api/posts', {
     method: 'POST', token,
     body: { board: '课程学业', title: '验证前不能发布', body: '这是一段满足长度要求的测试正文。', tags: [], images: [] },

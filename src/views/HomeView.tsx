@@ -5,6 +5,7 @@ import { boardIcon } from '../boardMeta'
 import { formatCount } from '../format'
 import PostCard from '../components/PostCard'
 import type { Board, CommunityPulse, CommunityStats, Me, Post, PostPage } from '../types'
+import { avatarStyle } from '../avatar'
 
 const PAGE_SIZE = 10
 
@@ -213,7 +214,7 @@ export default function HomeView({ user, boards, activeBoard, setActiveBoard, qu
           <div className="rail-title"><span><Users size={16} />本周活跃同学</span></div>
           <div className="active-students">
             {pulse?.activeStudents.map((student) => (
-              <button key={student.id} onClick={() => navigate(`/user/${student.id}`)}><span className="avatar">{student.avatar}</span><span><strong>{student.nickname}</strong><small>{student.roleLabel}</small></span><em>{student.contribution} 贡献</em></button>
+              <button key={student.id} onClick={() => navigate(`/user/${student.id}`)}><span className="avatar" style={avatarStyle(student.id)}>{student.avatar}</span><span><strong>{student.nickname}</strong><small>{student.roleLabel}</small></span><em>{student.contribution} 贡献</em></button>
             ))}
           </div>
         </section>

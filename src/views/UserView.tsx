@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, Heart, Mail, MessageCircle, PenLine, UserCheck
 import { api } from '../api'
 import PostCard from '../components/PostCard'
 import type { Me, Post, PostPage, PublicProfile } from '../types'
+import { avatarStyle } from '../avatar'
 
 export default function UserView({ id, user, navigate, notify, requireAuth, onReport }: {
   id: number
@@ -91,7 +92,7 @@ export default function UserView({ id, user, navigate, notify, requireAuth, onRe
     <div className="page-view">
       <button className="ghost-button" onClick={() => navigate('/')}><ArrowLeft size={15} />返回社区</button>
       <div className="profile-hero">
-        <div className="avatar profile-avatar">{profile.avatar}</div>
+        <div className="avatar profile-avatar" style={avatarStyle(profile.id)}>{profile.avatar}</div>
         <div>
           <span className="verified-label"><UserRound size={14} />{profile.roleLabel}</span>
           <h1>{profile.nickname}</h1>

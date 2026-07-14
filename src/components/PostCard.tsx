@@ -2,6 +2,7 @@ import { Bookmark, Eye, Flag, Heart, MessageCircle } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { timeAgo } from '../format'
 import type { Post } from '../types'
+import { avatarStyle } from '../avatar'
 
 export default function PostCard({ post, onOpen, onLike, onFavorite, onReport, onAuthor }: {
   post: Post
@@ -19,7 +20,7 @@ export default function PostCard({ post, onOpen, onLike, onFavorite, onReport, o
   return (
     <article className={`post-card clickable post-tone-${boardTone}`} onClick={() => onOpen(post.id)}>
       <div className="post-meta">
-        <span className="avatar">{post.author.avatar}</span>
+        <span className="avatar" style={avatarStyle(post.author.id ?? post.author.nickname)}>{post.author.avatar}</span>
         <div className="post-author-copy">
           <strong>
             {onAuthor && post.author.id

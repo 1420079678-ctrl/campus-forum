@@ -121,7 +121,7 @@ const intParam = (value: string) => {
 }
 
 function publicUser(user: SessionUser) {
-  return { ...user, verified: Boolean(user.verified), roleLabel: roleLabel(user), avatar: user.nickname.slice(0, 1) }
+  return { ...user, verified: Boolean(user.verified), roleLabel: roleLabel(user), avatar: user.avatar || user.nickname.slice(0, 1) }
 }
 
 // ---------- health ----------
@@ -140,7 +140,7 @@ app.post('/api/auth/register', authLimiter, wrap((req, res) => {
   const result = db.prepare("INSERT INTO users (username, password_hash, nickname, role, dept, grade, verified, campus, verification_status) VALUES (?, ?, ?, ?, ?, ?, 0, ?, 'unverified')")
     .run(username, hashPassword(password), nickname.trim(), 'student', typeof dept === 'string' ? dept.trim() : '', typeof grade === 'string' ? grade.trim() : '', campusVerificationMeta().campusName)
   const token = createSession(Number(result.lastInsertRowid))
-  const user = db.prepare('SELECT id, username, nickname, role, dept, grade, bio, verified, campus, email, verification_status as verificationStatus, created_at as createdAt FROM users WHERE id = ?').get(result.lastInsertRowid) as SessionUser
+  const user = db.prepare('SELECT id, username, nickname, avatar, role, dept, grade, bio, verified, campus, email, verification_status as verificationStatus, created_at as createdAt FROM users WHERE id = ?').get(result.lastInsertRowid) as SessionUser
   res.status(201).json({ token, user: publicUser(user) })
 }))
 
@@ -150,7 +150,7 @@ app.post('/api/auth/login', authLimiter, wrap((req, res) => {
   const row = db.prepare("SELECT id, password_hash FROM users WHERE username = ? AND status = 'active'").get(username) as { id: number; password_hash: string } | undefined
   if (!row || !verifyPassword(password, row.password_hash)) throw new HttpError(401, '用户名或密码不正确')
   const token = createSession(row.id)
-  const user = db.prepare('SELECT id, username, nickname, role, dept, grade, bio, verified, campus, email, verification_status as verificationStatus, created_at as createdAt FROM users WHERE id = ?').get(row.id) as SessionUser
+  const user = db.prepare('SELECT id, username, nickname, avatar, role, dept, grade, bio, verified, campus, email, verification_status as verificationStatus, created_at as createdAt FROM users WHERE id = ?').get(row.id) as SessionUser
   res.json({ token, user: publicUser(user) })
 }))
 
@@ -165,8 +165,8 @@ app.get('/api/me', requireAuth, wrap((req, res) => {
 }))
 
 app.patch('/api/me', requireAuth, wrap((req, res) => {
-  const { nickname, bio, dept, grade } = req.body ?? {}
-  const user = updateProfile(req.user!, { nickname, bio, dept, grade }) as SessionUser
+  const { nickname, avatar, bio, dept, grade } = req.body ?? {}
+  const user = updateProfile(req.user!, { nickname, avatar, bio, dept, grade }) as SessionUser
   res.json({ user: publicUser({ ...req.user!, ...user }) })
 }))
 

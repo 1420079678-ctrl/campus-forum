@@ -6,8 +6,10 @@ import {
 import { api } from '../api'
 import { timeAgo } from '../format'
 import type { Me, MyStats, Post, PostPage } from '../types'
+import { avatarStyle } from '../avatar'
 
 const statusLabel: Record<string, string> = { visible: '', pending: '待复核', hidden: '已隐藏' }
+const PROFILE_AVATARS = ['🌿', '🎧', '📚', '🏸', '📷', '☕', '🐱', '🪐', '🎨', '🛼', '🌻', '🧩']
 
 export default function ProfileView({ user, stats, notify, requireAuth, navigate, onLogout, onUserUpdated }: {
   user: Me | null
@@ -23,6 +25,7 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [nickname, setNickname] = useState(user?.nickname ?? '')
+  const [avatar, setAvatar] = useState(user?.avatar ?? '🌿')
   const [grade, setGrade] = useState(user?.grade ?? '')
   const [dept, setDept] = useState(user?.dept ?? '')
   const [bio, setBio] = useState(user?.bio ?? '')
@@ -50,6 +53,7 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
 
   useEffect(() => {
     setNickname(user?.nickname ?? '')
+    setAvatar(user?.avatar ?? '🌿')
     setGrade(user?.grade ?? '')
     setDept(user?.dept ?? '')
     setBio(user?.bio ?? '')
@@ -72,7 +76,7 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
     if (busy) return
     setBusy(true)
     try {
-      const payload = await api<{ user: Me }>('/api/me', { method: 'PATCH', body: { nickname, grade, dept, bio } })
+      const payload = await api<{ user: Me }>('/api/me', { method: 'PATCH', body: { nickname, avatar, grade, dept, bio } })
       onUserUpdated(payload.user)
       setEditing(false)
       notify('资料已更新')
@@ -149,7 +153,7 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
   return (
     <div className="page-view">
       <div className="profile-hero">
-        <div className="avatar profile-avatar">{user.avatar}</div>
+        <div className="avatar profile-avatar" style={avatarStyle(user.id)}>{user.avatar}</div>
         <div>
           <span className="verified-label"><ShieldCheck size={14} />{user.verified ? '已验证成员' : '未验证'} · {user.roleLabel}</span>
           <h1>{user.nickname}</h1>
@@ -165,6 +169,10 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
       {editing && (
         <div className="profile-panel edit-panel">
           <span className="section-kicker">EDIT PROFILE</span>
+          <div className="avatar-picker">
+            <strong>选择你的校园头像</strong>
+            <div>{PROFILE_AVATARS.map((item, index) => <button type="button" key={item} aria-label={`选择头像 ${item}`} aria-pressed={avatar === item} className={avatar === item ? 'selected' : ''} style={avatarStyle(index)} onClick={() => setAvatar(item)}>{item}</button>)}</div>
+          </div>
           <div className="edit-grid">
             <label>昵称<input value={nickname} maxLength={16} onChange={(event) => setNickname(event.target.value)} /></label>
             <label>年级<input value={grade} maxLength={10} onChange={(event) => setGrade(event.target.value)} placeholder="如：大二" /></label>

@@ -3,6 +3,7 @@ import { ArrowLeft, Mail, MessageCircle, Send, ShieldCheck } from 'lucide-react'
 import { api } from '../api'
 import { timeAgo } from '../format'
 import type { DirectConversation, DirectMessage, DirectThread, Me } from '../types'
+import { avatarStyle } from '../avatar'
 
 export default function MessagesView({ user, initialOtherId, navigate, notify, requireAuth, onUnreadChange }: {
   user: Me | null
@@ -91,7 +92,7 @@ export default function MessagesView({ user, initialOtherId, navigate, notify, r
           {conversations.length === 0 && <div className="conversation-empty">还没有私信。可以从同学主页发起交流。</div>}
           {conversations.map((item) => (
             <button key={item.id} className={thread?.other.id === item.other.id ? 'active' : ''} onClick={() => navigate(`/messages/${item.other.id}`)}>
-              <span className="avatar">{item.other.avatar}</span>
+              <span className="avatar" style={avatarStyle(item.other.id)}>{item.other.avatar}</span>
               <span><strong>{item.other.nickname}</strong><small>{item.lastMessage}</small></span>
               <span className="conversation-meta"><small>{timeAgo(item.updatedAt)}</small>{item.unread > 0 && <b>{item.unread}</b>}</span>
             </button>
@@ -104,7 +105,7 @@ export default function MessagesView({ user, initialOtherId, navigate, notify, r
             <>
               <div className="thread-head">
                 <button className="icon-button thread-back" onClick={() => { setThread(null); navigate('/messages') }} aria-label="返回会话列表"><ArrowLeft size={18} /></button>
-                <span className="avatar">{thread.other.avatar}</span><div><strong>{thread.other.nickname}</strong><small>{thread.other.roleLabel}</small></div>
+                <span className="avatar" style={avatarStyle(thread.other.id)}>{thread.other.avatar}</span><div><strong>{thread.other.nickname}</strong><small>{thread.other.roleLabel}</small></div>
               </div>
               <div className="message-list">
                 {thread.messages.length === 0 && <div className="conversation-empty">还没有消息，友善地打个招呼吧。</div>}

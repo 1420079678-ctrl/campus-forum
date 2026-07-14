@@ -4,6 +4,7 @@ import {
   Map, Menu, MessageCircle, Plus, Search, Settings2, ShieldCheck, UserRound,
 } from 'lucide-react'
 import './App.css'
+import { avatarStyle } from './avatar'
 import { api, hasToken, setToken } from './api'
 import { boardIcon } from './boardMeta'
 import { formatCount } from './format'
@@ -220,7 +221,7 @@ function App() {
           )}
           {user ? (
             <button className="profile-chip" onClick={() => navigate('/profile')}>
-              <span className="avatar small">{user.avatar}</span>
+              <span className="avatar small" style={avatarStyle(user.id)}>{user.avatar}</span>
               <span className="profile-name">{user.nickname}</span>
               <ChevronRight size={15} />
             </button>

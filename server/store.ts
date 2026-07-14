@@ -25,12 +25,14 @@ export function roleLabel(user: { role: string; dept: string; grade: string }) {
   return [user.grade, user.dept].filter(Boolean).join(' · ') || '在校学生'
 }
 
-type AuthorRow = { user_id: number; nickname: string; role: string; dept: string; grade: string; anonymous: number }
+type AuthorRow = { user_id: number; nickname: string; avatar?: string; role: string; dept: string; grade: string; anonymous: number }
+
+const AVATAR_OPTIONS = ['🌿', '🎧', '📚', '🏸', '📷', '☕', '🐱', '🪐', '🎨', '🛼', '🌻', '🧩']
 
 function authorFor(row: AuthorRow, viewer: Viewer) {
   const isOwn = viewer?.id === row.user_id
   const anonymous = Boolean(row.anonymous)
-  const real = { id: row.user_id, nickname: row.nickname, avatar: row.nickname.slice(0, 1), roleLabel: roleLabel(row), anonymous }
+  const real = { id: row.user_id, nickname: row.nickname, avatar: row.avatar || row.nickname.slice(0, 1), roleLabel: roleLabel(row), anonymous }
   if (!anonymous) return { author: real, isOwn }
   const masked = { nickname: isOwn ? `匿名（${row.nickname}）` : '匿名同学', avatar: '匿', roleLabel: '身份已隐藏', anonymous }
   if (viewer && canModerate(viewer.role)) return { author: masked, realAuthor: real, isOwn }
@@ -97,7 +99,7 @@ export function communityPulse() {
   `).all()
 
   const activeStudents = db.prepare(`
-    SELECT u.id, u.nickname, u.grade, u.dept,
+    SELECT u.id, u.nickname, u.avatar, u.grade, u.dept,
       (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id AND p.status = 'visible') as posts,
       (SELECT COUNT(*) FROM comments c WHERE c.user_id = u.id AND c.status = 'visible') as comments,
       (SELECT COALESCE(SUM(p.like_count), 0) FROM posts p WHERE p.user_id = u.id AND p.status = 'visible') as likes
@@ -118,7 +120,7 @@ export function communityPulse() {
     activeStudents: activeStudents.map((row) => ({
       id: row.id,
       nickname: row.nickname,
-      avatar: String(row.nickname).slice(0, 1),
+      avatar: row.avatar || String(row.nickname).slice(0, 1),
       roleLabel: roleLabel(row),
       contribution: Number(row.posts) + Number(row.comments),
     })),
@@ -132,7 +134,7 @@ const POST_FIELDS = `
   p.view_count as viewCount, p.like_count as likeCount, p.comment_count as commentCount,
   p.risk_level as riskLevel, p.risk_reasons as riskReasons,
   ${ISO('p.created_at')} as createdAt,
-  b.name as boardName, u.nickname, u.role, u.dept, u.grade,
+  b.name as boardName, u.nickname, u.avatar, u.role, u.dept, u.grade,
   (SELECT COUNT(*) FROM likes l WHERE l.user_id = @viewerId AND l.target_type = 'post' AND l.target_id = p.id) as liked,
   (SELECT COUNT(*) FROM favorites f WHERE f.user_id = @viewerId AND f.post_id = p.id) as favorited
 `
@@ -342,7 +344,7 @@ export function toggleFavorite(viewer: SessionUser, postId: number) {
 const COMMENT_FIELDS = `
   c.id, c.post_id as postId, c.parent_id as parentId, c.body, c.anonymous, c.status, c.user_id,
   c.like_count as likeCount, ${ISO('c.created_at')} as createdAt,
-  u.nickname, u.role, u.dept, u.grade,
+  u.nickname, u.avatar, u.role, u.dept, u.grade,
   (SELECT COUNT(*) FROM likes l WHERE l.user_id = @viewerId AND l.target_type = 'comment' AND l.target_id = c.id) as liked
 `
 
@@ -658,23 +660,26 @@ export function myStats(viewer: SessionUser) {
   return { posts, comments, likesReceived, helped, favorites, needs, followers, following, unreadMessages, joinedDays }
 }
 
-export function updateProfile(viewer: SessionUser, input: { nickname?: string; bio?: string; dept?: string; grade?: string }) {
+export function updateProfile(viewer: SessionUser, input: { nickname?: string; avatar?: string; bio?: string; dept?: string; grade?: string }) {
   const nickname = input.nickname?.trim()
   if (nickname !== undefined && (nickname.length < 2 || nickname.length > 16)) throw new HttpError(400, '昵称长度需要在 2-16 个字符之间')
+  const avatar = input.avatar?.trim()
+  if (avatar !== undefined && !AVATAR_OPTIONS.includes(avatar)) throw new HttpError(400, '请选择有效的校园头像')
   db.prepare(`
     UPDATE users SET
       nickname = COALESCE(?, nickname),
+      avatar = COALESCE(?, avatar),
       bio = COALESCE(?, bio),
       dept = COALESCE(?, dept),
       grade = COALESCE(?, grade)
     WHERE id = ?
-  `).run(nickname ?? null, input.bio?.trim() ?? null, input.dept?.trim() ?? null, input.grade?.trim() ?? null, viewer.id)
-  return db.prepare('SELECT id, username, nickname, role, dept, grade, bio, verified, campus, email, verification_status as verificationStatus FROM users WHERE id = ?').get(viewer.id)
+  `).run(nickname ?? null, avatar ?? null, input.bio?.trim() ?? null, input.dept?.trim() ?? null, input.grade?.trim() ?? null, viewer.id)
+  return db.prepare('SELECT id, username, nickname, avatar, role, dept, grade, bio, verified, campus, email, verification_status as verificationStatus FROM users WHERE id = ?').get(viewer.id)
 }
 
 export function publicProfile(userId: number, viewer: Viewer = null) {
   const row = db.prepare(`
-    SELECT id, nickname, role, dept, grade, bio, campus, verified, status, ${ISO('created_at')} as createdAt,
+    SELECT id, nickname, avatar, role, dept, grade, bio, campus, verified, status, ${ISO('created_at')} as createdAt,
       CAST(julianday('now') - julianday(created_at) AS INTEGER) as joinedDays
     FROM users WHERE id = ? AND role IN ('student','moderator','admin')
   `).get(userId) as any
@@ -694,7 +699,7 @@ export function publicProfile(userId: number, viewer: Viewer = null) {
   return {
     id: row.id,
     nickname: row.nickname,
-    avatar: String(row.nickname).slice(0, 1),
+    avatar: row.avatar || String(row.nickname).slice(0, 1),
     roleLabel: roleLabel(row),
     bio: row.bio,
     campus: row.campus,
@@ -729,7 +734,7 @@ function directPair(a: number, b: number) {
 
 function ensureDirectConversation(viewerId: number, otherId: number) {
   if (viewerId === otherId) throw new HttpError(400, '不能给自己发私信')
-  const target = db.prepare("SELECT id, nickname, role, dept, grade, status FROM users WHERE id = ? AND status = 'active' AND role IN ('student','moderator','admin')").get(otherId) as any
+  const target = db.prepare("SELECT id, nickname, avatar, role, dept, grade, status FROM users WHERE id = ? AND status = 'active' AND role IN ('student','moderator','admin')").get(otherId) as any
   if (!target) throw new HttpError(404, '用户不存在')
   const [low, high] = directPair(viewerId, otherId)
   db.prepare('INSERT OR IGNORE INTO direct_conversations (user_low_id, user_high_id) VALUES (?, ?)').run(low, high)
@@ -741,7 +746,7 @@ export function listDirectConversations(viewer: SessionUser) {
   const rows = db.prepare(`
     SELECT c.id,
       CASE WHEN c.user_low_id = @viewerId THEN c.user_high_id ELSE c.user_low_id END as otherId,
-      u.nickname, u.role, u.dept, u.grade,
+      u.nickname, u.avatar, u.role, u.dept, u.grade,
       (SELECT body FROM direct_messages lm WHERE lm.conversation_id = c.id ORDER BY lm.id DESC LIMIT 1) as lastMessage,
       (SELECT ${ISO('lm.created_at')} FROM direct_messages lm WHERE lm.conversation_id = c.id ORDER BY lm.id DESC LIMIT 1) as updatedAt,
       (SELECT COUNT(*) FROM direct_messages um WHERE um.conversation_id = c.id AND um.sender_id != @viewerId AND um.read_at IS NULL) as unread
@@ -753,7 +758,7 @@ export function listDirectConversations(viewer: SessionUser) {
   `).all({ viewerId: viewer.id }) as any[]
   return rows.map((row) => ({
     id: row.id,
-    other: { id: row.otherId, nickname: row.nickname, avatar: String(row.nickname).slice(0, 1), roleLabel: roleLabel(row) },
+    other: { id: row.otherId, nickname: row.nickname, avatar: row.avatar || String(row.nickname).slice(0, 1), roleLabel: roleLabel(row) },
     lastMessage: row.lastMessage,
     updatedAt: row.updatedAt,
     unread: Number(row.unread),
@@ -768,7 +773,7 @@ export function getDirectThread(viewer: SessionUser, otherId: number) {
     FROM direct_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 200
   `).all(conversationId)
   return {
-    other: { id: target.id, nickname: target.nickname, avatar: String(target.nickname).slice(0, 1), roleLabel: roleLabel(target) },
+    other: { id: target.id, nickname: target.nickname, avatar: target.avatar || String(target.nickname).slice(0, 1), roleLabel: roleLabel(target) },
     messages,
   }
 }

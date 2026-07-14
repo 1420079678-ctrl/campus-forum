@@ -11,7 +11,7 @@ export const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-const SCHEMA_VERSION = 8
+const SCHEMA_VERSION = 9
 const currentVersion = db.pragma('user_version', { simple: true }) as number
 
 if (currentVersion < 2) {
@@ -122,6 +122,16 @@ if (currentVersion < 7) {
 }
 if (currentVersion < 8) {
   seedCampusScenes()
+}
+if (currentVersion < 9) {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '';
+    UPDATE users SET avatar = CASE (id % 12)
+      WHEN 0 THEN '🧩' WHEN 1 THEN '🌿' WHEN 2 THEN '🎧' WHEN 3 THEN '📚'
+      WHEN 4 THEN '🏸' WHEN 5 THEN '📷' WHEN 6 THEN '☕' WHEN 7 THEN '🐱'
+      WHEN 8 THEN '🪐' WHEN 9 THEN '🎨' WHEN 10 THEN '🛼' ELSE '🌻' END
+    WHERE avatar = '';
+  `)
 }
 db.pragma(`user_version = ${SCHEMA_VERSION}`)
 
