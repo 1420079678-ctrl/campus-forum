@@ -4,6 +4,7 @@ export type ModerationResult = {
   risk: RiskLevel
   score: number
   reasons: string[]
+  source?: 'rules' | 'llm+rules'
 }
 
 type Rule = {
@@ -37,7 +38,65 @@ export function moderateText(...parts: Array<string | undefined>): ModerationRes
     }
   }
   const risk: RiskLevel = score >= 6 ? 'high' : score >= 3 ? 'medium' : 'low'
-  return { risk, score, reasons }
+  return { risk, score, reasons, source: 'rules' }
+}
+
+const riskRank: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 }
+
+/**
+ * Optional OpenAI-compatible moderation adapter. Rules always run first and
+ * remain authoritative when the external model is unavailable or less strict.
+ */
+export async function moderateTextWithAI(...parts: Array<string | undefined>): Promise<ModerationResult> {
+  const ruleResult = moderateText(...parts)
+  const endpoint = process.env.LLM_MODERATION_URL?.trim()
+  const apiKey = process.env.LLM_API_KEY?.trim()
+  if (!endpoint || !apiKey) return ruleResult
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.LLM_TIMEOUT_MS ?? 5000))
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: process.env.LLM_MODEL ?? 'gpt-4.1-mini',
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: '你是大学校园社区内容安全审核员。只输出 JSON：{"risk":"low|medium|high","score":0到10的整数,"reasons":["简短中文理由"]}。重点识别诈骗、学术不端、隐私泄露、骚扰仇恨、违法交易和人身安全风险。一般意见分歧不得判为违规。',
+          },
+          { role: 'user', content: parts.filter(Boolean).join('\n').slice(0, 8000) },
+        ],
+      }),
+    })
+    if (!response.ok) throw new Error(`LLM moderation HTTP ${response.status}`)
+    const payload = await response.json() as any
+    const content = payload?.choices?.[0]?.message?.content
+    if (typeof content !== 'string') throw new Error('LLM moderation returned no content')
+    const parsed = JSON.parse(content) as { risk?: string; score?: number; reasons?: unknown }
+    if (parsed.risk !== 'low' && parsed.risk !== 'medium' && parsed.risk !== 'high') throw new Error('LLM moderation returned invalid risk')
+    const modelRisk = parsed.risk as RiskLevel
+    const risk = riskRank[modelRisk] > riskRank[ruleResult.risk] ? modelRisk : ruleResult.risk
+    const reasons = Array.from(new Set([
+      ...ruleResult.reasons,
+      ...(Array.isArray(parsed.reasons) ? parsed.reasons.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean).slice(0, 5) : []),
+    ]))
+    return {
+      risk,
+      score: Math.max(ruleResult.score, Math.min(Math.max(Number(parsed.score) || 0, 0), 10)),
+      reasons,
+      source: 'llm+rules',
+    }
+  } catch (error) {
+    console.warn('External LLM moderation unavailable; using local rules:', error instanceof Error ? error.message : error)
+    return ruleResult
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 export const riskLabel: Record<RiskLevel, string> = { low: '低风险', medium: '中风险', high: '高风险' }

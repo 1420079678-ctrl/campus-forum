@@ -10,6 +10,9 @@
     "build": "tsc -b && vite build",
     "start": "tsx server/index.ts",
     "lint": "oxlint",
+    "test": "tsx --test tests/*.test.ts",
+    "check": "npm run lint && npm run test && npm run build",
+    "export:data": "tsx scripts/export-data.ts",
     "preview": "vite preview"
   },
   "dependencies": {

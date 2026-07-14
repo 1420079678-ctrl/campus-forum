@@ -11,6 +11,7 @@ const demoAccounts = [
   { username: 'houqin', password: 'demo123456', label: '后勤服务中心' },
   { username: 'admin', password: 'admin123456', label: '管理员' },
 ]
+const showDemoAccounts = import.meta.env.DEV
 
 export default function AuthModal({ onClose, onAuthed }: { onClose: () => void; onAuthed: (user: Me) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -79,8 +80,8 @@ export default function AuthModal({ onClose, onAuthed }: { onClose: () => void; 
         {error && <div className="form-error">{error}</div>}
         <div className="composer-note">
           <ShieldCheck size={16} />
-          <span>{mode === 'register' ? '注册即视为完成校园身份验证（演示环境）。实名信息仅用于安全验证，前台展示昵称。' : '演示账号一键填入：'}
-            {mode === 'login' && (
+          <span>{mode === 'register' ? '注册后请到个人空间使用校园邮箱完成身份验证；验证前可以浏览，验证后可发帖、评论和私信。' : showDemoAccounts ? '演示账号一键填入：' : '请使用校园账号登录。'}
+            {mode === 'login' && showDemoAccounts && (
               <span className="demo-accounts">
                 {demoAccounts.map((account) => (
                   <button key={account.username} onClick={() => { setUsername(account.username); setPassword(account.password) }}>{account.label}</button>

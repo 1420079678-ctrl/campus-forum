@@ -15,6 +15,9 @@ export type Me = {
   grade: string
   bio: string
   verified: boolean
+  campus: string
+  email: string
+  verificationStatus: 'unverified' | 'pending' | 'verified'
   roleLabel: string
   avatar: string
 }
@@ -26,6 +29,9 @@ export type MyStats = {
   helped: number
   favorites: number
   needs: number
+  followers: number
+  following: number
+  unreadMessages: number
   joinedDays: number
 }
 
@@ -45,6 +51,7 @@ export type Post = {
   title: string
   body: string
   tags: string[]
+  images: string[]
   status: 'visible' | 'pending' | 'hidden' | 'deleted'
   featured: boolean
   edited: boolean
@@ -175,9 +182,40 @@ export type PublicProfile = {
   avatar: string
   roleLabel: string
   bio: string
+  campus: string
+  verified: boolean
+  following: boolean
   joinedDays: number
   createdAt: string
-  stats: { posts: number; comments: number; likesReceived: number }
+  stats: { posts: number; comments: number; likesReceived: number; followers: number; following: number }
+}
+
+export type DirectUser = {
+  id: number
+  nickname: string
+  avatar: string
+  roleLabel: string
+}
+
+export type DirectConversation = {
+  id: number
+  other: DirectUser
+  lastMessage: string
+  updatedAt: string
+  unread: number
+}
+
+export type DirectMessage = {
+  id: number
+  senderId: number
+  body: string
+  createdAt: string
+  readAt: string | null
+}
+
+export type DirectThread = {
+  other: DirectUser
+  messages: DirectMessage[]
 }
 
 export type AdminUser = {

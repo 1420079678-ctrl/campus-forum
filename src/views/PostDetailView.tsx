@@ -186,6 +186,11 @@ export default function PostDetailView({ id, user, boards, navigate, notify, req
           <div className="post-board"><Hash size={13} />{post.board}</div>
           <h1>{post.title}</h1>
           <p className="detail-body">{post.body}</p>
+          {post.images.length > 0 && (
+            <div className={`post-images detail-images count-${Math.min(post.images.length, 4)}`}>
+              {post.images.map((src, index) => <img key={src} src={src} alt={`${post.title} 配图 ${index + 1}`} />)}
+            </div>
+          )}
           {post.tags.length > 0 && <div className="tag-row">{post.tags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}
         </div>
         <div className="post-actions detail-actions">

@@ -20,6 +20,7 @@ export default function HomeView({ user, boards, activeBoard, setActiveBoard, qu
   onReport: (post: Post) => void
 }) {
   const [sort, setSort] = useState<'recommend' | 'latest' | 'hot'>('recommend')
+  const [feed, setFeed] = useState<'campus' | 'following'>('campus')
   const [posts, setPosts] = useState<Post[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -40,7 +41,7 @@ export default function HomeView({ user, boards, activeBoard, setActiveBoard, qu
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    api<PostPage>(`/api/posts?board=${encodeURIComponent(activeBoard)}&q=${encodeURIComponent(debouncedQuery)}&sort=${sort}&page=1&pageSize=${PAGE_SIZE}`)
+    api<PostPage>(`/api/posts?board=${encodeURIComponent(activeBoard)}&q=${encodeURIComponent(debouncedQuery)}&sort=${sort}&following=${feed === 'following' ? '1' : '0'}&page=1&pageSize=${PAGE_SIZE}`)
       .then((payload) => {
         if (cancelled) return
         setPosts(payload.items)
@@ -50,12 +51,12 @@ export default function HomeView({ user, boards, activeBoard, setActiveBoard, qu
       .catch((err) => !cancelled && notify(err instanceof Error ? err.message : '加载失败'))
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [activeBoard, debouncedQuery, sort, refreshKey, user?.id, notify])
+  }, [activeBoard, debouncedQuery, sort, feed, refreshKey, user?.id, notify])
 
   const loadMore = async () => {
     setLoadingMore(true)
     try {
-      const payload = await api<PostPage>(`/api/posts?board=${encodeURIComponent(activeBoard)}&q=${encodeURIComponent(debouncedQuery)}&sort=${sort}&page=${page + 1}&pageSize=${PAGE_SIZE}`)
+      const payload = await api<PostPage>(`/api/posts?board=${encodeURIComponent(activeBoard)}&q=${encodeURIComponent(debouncedQuery)}&sort=${sort}&following=${feed === 'following' ? '1' : '0'}&page=${page + 1}&pageSize=${PAGE_SIZE}`)
       setPosts((items) => {
         const seen = new Set(items.map((post) => post.id))
         return [...items, ...payload.items.filter((post) => !seen.has(post.id))]
@@ -125,6 +126,13 @@ export default function HomeView({ user, boards, activeBoard, setActiveBoard, qu
       <div><span className="section-kicker">COMMUNITY FEED</span><h2>社区动态</h2></div>
       <button className="primary-button" onClick={onCompose}><Plus size={17} />发起讨论</button>
     </div>
+    <div className="feed-scope" aria-label="信息流范围">
+      <button className={feed === 'campus' ? 'active' : ''} onClick={() => setFeed('campus')}>校园广场</button>
+      <button className={feed === 'following' ? 'active' : ''} onClick={() => {
+        if (!user && !requireAuth()) return
+        setFeed('following')
+      }}>我的关注</button>
+    </div>
     <div className="feed-toolbar">
       <div className="filter-pills">
         {['全部', ...boards].map((name) => (
@@ -146,8 +154,8 @@ export default function HomeView({ user, boards, activeBoard, setActiveBoard, qu
       {!loading && posts.length === 0 && (
         <div className="empty-state">
           <Search size={26} />
-          <h3>没有找到相关讨论</h3>
-          <p>换个关键词，或者发起一个新的话题。</p>
+          <h3>{feed === 'following' ? '关注流还是空的' : '没有找到相关讨论'}</h3>
+          <p>{feed === 'following' ? '去校园广场关注感兴趣的同学，他们的新帖子会出现在这里。' : '换个关键词，或者发起一个新的话题。'}</p>
         </div>
       )}
       {!loading && posts.length < total && (

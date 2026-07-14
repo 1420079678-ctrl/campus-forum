@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell, CheckCircle2, ChevronRight, ClipboardList, Home, LockKeyhole, LogIn,
-  Menu, Search, Settings2, ShieldCheck, Sparkles, UserRound,
+  Menu, MessageCircle, Search, Settings2, ShieldCheck, Sparkles, UserRound,
 } from 'lucide-react'
 import './App.css'
 import { api, hasToken, setToken } from './api'
@@ -18,6 +18,7 @@ import ModerationView from './views/ModerationView'
 import ProfileView from './views/ProfileView'
 import UserView from './views/UserView'
 import AdminView from './views/AdminView'
+import MessagesView from './views/MessagesView'
 import type { Board, CommentItem, Me, MyStats, Post } from './types'
 
 type Route =
@@ -28,6 +29,7 @@ type Route =
   | { tab: 'moderation' }
   | { tab: 'admin' }
   | { tab: 'profile' }
+  | { tab: 'messages'; userId?: number }
 
 function parseRoute(hash: string): Route {
   const path = hash.replace(/^#/, '')
@@ -35,6 +37,8 @@ function parseRoute(hash: string): Route {
   if (postMatch) return { tab: 'post', id: Number(postMatch[1]) }
   const userMatch = path.match(/^\/user\/(\d+)/)
   if (userMatch) return { tab: 'user', id: Number(userMatch[1]) }
+  const messageMatch = path.match(/^\/messages(?:\/(\d+))?/)
+  if (messageMatch) return { tab: 'messages', userId: messageMatch[1] ? Number(messageMatch[1]) : undefined }
   if (path.startsWith('/needs')) return { tab: 'needs' }
   if (path.startsWith('/moderation')) return { tab: 'moderation' }
   if (path.startsWith('/admin')) return { tab: 'admin' }
@@ -57,6 +61,7 @@ function App() {
   const [reportTarget, setReportTarget] = useState<ReportTargetInput | null>(null)
   const [unread, setUnread] = useState(0)
   const [modPending, setModPending] = useState(0)
+  const [messageUnread, setMessageUnread] = useState(0)
   const [feedRefresh, setFeedRefresh] = useState(0)
   const toastTimer = useRef<number>(0)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -85,11 +90,13 @@ function App() {
       .then((payload) => {
         setUser(payload.user)
         setMyStats(payload.stats)
+        setMessageUnread(payload.stats.unreadMessages ?? 0)
       })
       .catch(() => {
         setToken(null)
         setUser(null)
         setMyStats(null)
+        setMessageUnread(0)
       })
   }, [])
 
@@ -156,6 +163,11 @@ function App() {
 
   const openComposer = () => {
     if (!requireAuth()) return
+    if (!user?.verified) {
+      notify('完成校园邮箱验证后即可发起讨论')
+      navigate('/profile')
+      return
+    }
     setComposerOpen(true)
   }
 
@@ -220,6 +232,7 @@ function App() {
           <nav className="main-nav">
             <NavItem icon={Home} label="社区首页" active={route.tab === 'home' || route.tab === 'post' || route.tab === 'user'} onClick={() => navigate('/')} />
             <NavItem icon={ClipboardList} label="诉求墙" active={route.tab === 'needs'} onClick={() => navigate('/needs')} />
+            <NavItem icon={MessageCircle} label="站内私信" active={route.tab === 'messages'} badge={messageUnread > 0 ? String(messageUnread) : undefined} onClick={() => navigate('/messages')} />
             {canModerate && <NavItem icon={ShieldCheck} label="内容审核台" active={route.tab === 'moderation'} badge={modPending > 0 ? String(modPending) : undefined} onClick={() => navigate('/moderation')} />}
             {isAdmin && <NavItem icon={Settings2} label="管理后台" active={route.tab === 'admin'} onClick={() => navigate('/admin')} />}
             <NavItem icon={UserRound} label="个人空间" active={route.tab === 'profile'} badge={unread > 0 ? String(unread) : undefined} onClick={() => navigate('/profile')} />
@@ -303,6 +316,16 @@ function App() {
               navigate={navigate}
               onLogout={handleLogout}
               onUserUpdated={(updated) => { setUser(updated); loadMe() }}
+            />
+          )}
+          {route.tab === 'messages' && (
+            <MessagesView
+              user={user}
+              initialOtherId={route.userId}
+              navigate={navigate}
+              notify={notify}
+              requireAuth={requireAuth}
+              onUnreadChange={setMessageUnread}
             />
           )}
         </main>

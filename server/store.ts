@@ -1,7 +1,7 @@
 import { db } from './db.js'
 import type { SessionUser } from './auth.js'
 import { canModerate } from './auth.js'
-import { moderateText, riskLabel, type ModerationResult } from './moderate.js'
+import { moderateTextWithAI, riskLabel, type ModerationResult } from './moderate.js'
 
 export class HttpError extends Error {
   status: number
@@ -68,7 +68,7 @@ export function communityStats() {
 // ---------- posts ----------
 
 const POST_FIELDS = `
-  p.id, p.user_id, p.board_id, p.title, p.body, p.tags, p.anonymous, p.status, p.featured, p.edited,
+  p.id, p.user_id, p.board_id, p.title, p.body, p.tags, p.images, p.anonymous, p.status, p.featured, p.edited,
   p.view_count as viewCount, p.like_count as likeCount, p.comment_count as commentCount,
   p.risk_level as riskLevel, p.risk_reasons as riskReasons,
   ${ISO('p.created_at')} as createdAt,
@@ -88,6 +88,7 @@ function mapPost(row: any, viewer: Viewer) {
     title: row.title,
     body: row.body,
     tags: JSON.parse(row.tags) as string[],
+    images: JSON.parse(row.images || '[]') as string[],
     status: row.status,
     featured: Boolean(row.featured),
     edited: Boolean(row.edited),
@@ -113,6 +114,7 @@ export type PostQuery = {
   authorId?: number
   favoritedBy?: number
   profileId?: number
+  followingBy?: number
 }
 
 export function listPosts(query: PostQuery, viewer: Viewer) {
@@ -127,6 +129,9 @@ export function listPosts(query: PostQuery, viewer: Viewer) {
   } else if (query.profileId) {
     where.push("p.user_id = @profileId AND p.status = 'visible' AND p.anonymous = 0")
     params.profileId = query.profileId
+  } else if (query.followingBy) {
+    where.push("p.status = 'visible' AND p.anonymous = 0 AND EXISTS (SELECT 1 FROM user_follows uf WHERE uf.follower_id = @followingBy AND uf.following_id = p.user_id)")
+    params.followingBy = query.followingBy
   } else {
     where.push("p.status = 'visible'")
   }
@@ -165,15 +170,15 @@ export function getPost(id: number, viewer: Viewer, { countView = false } = {}) 
   return mapPost(row, viewer)
 }
 
-export function createPost(viewer: SessionUser, input: { board: string; title: string; body: string; tags: string[]; anonymous: boolean }) {
+export async function createPost(viewer: SessionUser, input: { board: string; title: string; body: string; tags: string[]; images: string[]; anonymous: boolean }) {
   const board = db.prepare('SELECT id FROM boards WHERE name = ?').get(input.board) as { id: number } | undefined
   if (!board) throw new HttpError(400, '板块不存在')
-  const moderation = moderateText(input.title, input.body, input.tags.join(' '))
+  const moderation = await moderateTextWithAI(input.title, input.body, input.tags.join(' '))
   const status = moderation.risk === 'high' ? 'pending' : 'visible'
   const result = db.prepare(`
-    INSERT INTO posts (user_id, board_id, title, body, tags, anonymous, status, risk_level, risk_reasons)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(viewer.id, board.id, input.title.trim(), input.body.trim(), JSON.stringify(input.tags), input.anonymous ? 1 : 0, status, moderation.risk, JSON.stringify(moderation.reasons))
+    INSERT INTO posts (user_id, board_id, title, body, tags, images, anonymous, status, risk_level, risk_reasons)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(viewer.id, board.id, input.title.trim(), input.body.trim(), JSON.stringify(input.tags), JSON.stringify(input.images), input.anonymous ? 1 : 0, status, moderation.risk, JSON.stringify(moderation.reasons))
   const postId = Number(result.lastInsertRowid)
   logAudit('ai', 'ai-guard-01',
     moderation.risk === 'high' ? 'FLAG_PENDING' : moderation.risk === 'medium' ? 'FLAG_REVIEW' : 'AUTO_PASS',
@@ -189,20 +194,20 @@ export function createPost(viewer: SessionUser, input: { board: string; title: s
   return { post: getPost(postId, viewer), moderation }
 }
 
-export function updatePost(viewer: SessionUser, id: number, input: { board: string; title: string; body: string; tags: string[]; anonymous: boolean }) {
+export async function updatePost(viewer: SessionUser, id: number, input: { board: string; title: string; body: string; tags: string[]; images: string[]; anonymous: boolean }) {
   const row = db.prepare('SELECT id, user_id, status FROM posts WHERE id = ?').get(id) as any
   if (!row || row.status === 'deleted') throw new HttpError(404, '帖子不存在')
   if (row.user_id !== viewer.id) throw new HttpError(403, '只能编辑自己的帖子')
   if (row.status === 'hidden') throw new HttpError(403, '帖子已被隐藏，暂时无法编辑，如有疑问请联系管理员')
   const board = db.prepare('SELECT id FROM boards WHERE name = ?').get(input.board) as { id: number } | undefined
   if (!board) throw new HttpError(400, '板块不存在')
-  const moderation = moderateText(input.title, input.body, input.tags.join(' '))
+  const moderation = await moderateTextWithAI(input.title, input.body, input.tags.join(' '))
   const status = moderation.risk === 'high' ? 'pending' : 'visible'
   db.prepare(`
-    UPDATE posts SET board_id = ?, title = ?, body = ?, tags = ?, anonymous = ?, status = ?,
+    UPDATE posts SET board_id = ?, title = ?, body = ?, tags = ?, images = ?, anonymous = ?, status = ?,
       risk_level = ?, risk_reasons = ?, edited = 1, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(board.id, input.title.trim(), input.body.trim(), JSON.stringify(input.tags), input.anonymous ? 1 : 0, status, moderation.risk, JSON.stringify(moderation.reasons), id)
+  `).run(board.id, input.title.trim(), input.body.trim(), JSON.stringify(input.tags), JSON.stringify(input.images), input.anonymous ? 1 : 0, status, moderation.risk, JSON.stringify(moderation.reasons), id)
   logAudit('ai', 'ai-guard-01',
     moderation.risk === 'high' ? 'FLAG_PENDING' : moderation.risk === 'medium' ? 'FLAG_REVIEW' : 'AUTO_PASS',
     'post', id,
@@ -586,8 +591,11 @@ export function myStats(viewer: SessionUser) {
   `).get({ id: viewer.id }) as { c: number }).c
   const favorites = (db.prepare('SELECT COUNT(*) as c FROM favorites WHERE user_id = ?').get(viewer.id) as { c: number }).c
   const needs = (db.prepare('SELECT COUNT(*) as c FROM needs WHERE user_id = ?').get(viewer.id) as { c: number }).c
+  const followers = (db.prepare('SELECT COUNT(*) as c FROM user_follows WHERE following_id = ?').get(viewer.id) as { c: number }).c
+  const following = (db.prepare('SELECT COUNT(*) as c FROM user_follows WHERE follower_id = ?').get(viewer.id) as { c: number }).c
+  const unreadMessages = directUnreadCount(viewer)
   const joinedDays = (db.prepare("SELECT CAST(julianday('now') - julianday(created_at) AS INTEGER) as c FROM users WHERE id = ?").get(viewer.id) as { c: number }).c
-  return { posts, comments, likesReceived, helped, favorites, needs, joinedDays }
+  return { posts, comments, likesReceived, helped, favorites, needs, followers, following, unreadMessages, joinedDays }
 }
 
 export function updateProfile(viewer: SessionUser, input: { nickname?: string; bio?: string; dept?: string; grade?: string }) {
@@ -601,12 +609,12 @@ export function updateProfile(viewer: SessionUser, input: { nickname?: string; b
       grade = COALESCE(?, grade)
     WHERE id = ?
   `).run(nickname ?? null, input.bio?.trim() ?? null, input.dept?.trim() ?? null, input.grade?.trim() ?? null, viewer.id)
-  return db.prepare('SELECT id, username, nickname, role, dept, grade, bio, verified FROM users WHERE id = ?').get(viewer.id)
+  return db.prepare('SELECT id, username, nickname, role, dept, grade, bio, verified, campus, email, verification_status as verificationStatus FROM users WHERE id = ?').get(viewer.id)
 }
 
-export function publicProfile(userId: number) {
+export function publicProfile(userId: number, viewer: Viewer = null) {
   const row = db.prepare(`
-    SELECT id, nickname, role, dept, grade, bio, status, ${ISO('created_at')} as createdAt,
+    SELECT id, nickname, role, dept, grade, bio, campus, verified, status, ${ISO('created_at')} as createdAt,
       CAST(julianday('now') - julianday(created_at) AS INTEGER) as joinedDays
     FROM users WHERE id = ?
   `).get(userId) as any
@@ -618,16 +626,107 @@ export function publicProfile(userId: number) {
       (l.target_type = 'post' AND l.target_id IN (SELECT id FROM posts WHERE user_id = @id AND anonymous = 0)) OR
       (l.target_type = 'comment' AND l.target_id IN (SELECT id FROM comments WHERE user_id = @id AND anonymous = 0))
   `).get({ id: userId }) as { c: number }).c
+  const followers = (db.prepare('SELECT COUNT(*) as c FROM user_follows WHERE following_id = ?').get(userId) as { c: number }).c
+  const followingCount = (db.prepare('SELECT COUNT(*) as c FROM user_follows WHERE follower_id = ?').get(userId) as { c: number }).c
+  const following = viewer
+    ? Boolean((db.prepare('SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?').get(viewer.id, userId)))
+    : false
   return {
     id: row.id,
     nickname: row.nickname,
     avatar: String(row.nickname).slice(0, 1),
     roleLabel: roleLabel(row),
     bio: row.bio,
+    campus: row.campus,
+    verified: Boolean(row.verified),
     joinedDays: row.joinedDays,
     createdAt: row.createdAt,
-    stats: { posts, comments, likesReceived },
+    following,
+    stats: { posts, comments, likesReceived, followers, following: followingCount },
   }
+}
+
+export function toggleUserFollow(viewer: SessionUser, userId: number) {
+  if (viewer.id === userId) throw new HttpError(400, '不能关注自己')
+  const target = db.prepare("SELECT id, nickname FROM users WHERE id = ? AND status = 'active'").get(userId) as { id: number; nickname: string } | undefined
+  if (!target) throw new HttpError(404, '用户不存在')
+  const exists = db.prepare('SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?').get(viewer.id, userId)
+  if (exists) {
+    db.prepare('DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?').run(viewer.id, userId)
+  } else {
+    db.prepare('INSERT INTO user_follows (follower_id, following_id) VALUES (?, ?)').run(viewer.id, userId)
+    notify(userId, { type: 'follow', actorId: viewer.id, targetType: 'user', targetId: viewer.id, content: `${viewer.nickname} 关注了你` })
+  }
+  const followerCount = (db.prepare('SELECT COUNT(*) as c FROM user_follows WHERE following_id = ?').get(userId) as { c: number }).c
+  return { following: !exists, followerCount }
+}
+
+// ---------- direct messages ----------
+
+function directPair(a: number, b: number) {
+  return a < b ? [a, b] as const : [b, a] as const
+}
+
+function ensureDirectConversation(viewerId: number, otherId: number) {
+  if (viewerId === otherId) throw new HttpError(400, '不能给自己发私信')
+  const target = db.prepare("SELECT id, nickname, role, dept, grade, status FROM users WHERE id = ? AND status = 'active'").get(otherId) as any
+  if (!target) throw new HttpError(404, '用户不存在')
+  const [low, high] = directPair(viewerId, otherId)
+  db.prepare('INSERT OR IGNORE INTO direct_conversations (user_low_id, user_high_id) VALUES (?, ?)').run(low, high)
+  const conversation = db.prepare('SELECT id FROM direct_conversations WHERE user_low_id = ? AND user_high_id = ?').get(low, high) as { id: number }
+  return { conversationId: conversation.id, target }
+}
+
+export function listDirectConversations(viewer: SessionUser) {
+  const rows = db.prepare(`
+    SELECT c.id,
+      CASE WHEN c.user_low_id = @viewerId THEN c.user_high_id ELSE c.user_low_id END as otherId,
+      u.nickname, u.role, u.dept, u.grade,
+      (SELECT body FROM direct_messages lm WHERE lm.conversation_id = c.id ORDER BY lm.id DESC LIMIT 1) as lastMessage,
+      (SELECT ${ISO('lm.created_at')} FROM direct_messages lm WHERE lm.conversation_id = c.id ORDER BY lm.id DESC LIMIT 1) as updatedAt,
+      (SELECT COUNT(*) FROM direct_messages um WHERE um.conversation_id = c.id AND um.sender_id != @viewerId AND um.read_at IS NULL) as unread
+    FROM direct_conversations c
+    JOIN users u ON u.id = CASE WHEN c.user_low_id = @viewerId THEN c.user_high_id ELSE c.user_low_id END
+    WHERE (c.user_low_id = @viewerId OR c.user_high_id = @viewerId) AND u.status = 'active'
+      AND EXISTS (SELECT 1 FROM direct_messages em WHERE em.conversation_id = c.id)
+    ORDER BY COALESCE(updatedAt, c.updated_at) DESC
+  `).all({ viewerId: viewer.id }) as any[]
+  return rows.map((row) => ({
+    id: row.id,
+    other: { id: row.otherId, nickname: row.nickname, avatar: String(row.nickname).slice(0, 1), roleLabel: roleLabel(row) },
+    lastMessage: row.lastMessage,
+    updatedAt: row.updatedAt,
+    unread: Number(row.unread),
+  }))
+}
+
+export function getDirectThread(viewer: SessionUser, otherId: number) {
+  const { conversationId, target } = ensureDirectConversation(viewer.id, otherId)
+  db.prepare("UPDATE direct_messages SET read_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND sender_id != ? AND read_at IS NULL").run(conversationId, viewer.id)
+  const messages = db.prepare(`
+    SELECT id, sender_id as senderId, body, ${ISO('created_at')} as createdAt, read_at as readAt
+    FROM direct_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 200
+  `).all(conversationId)
+  return {
+    other: { id: target.id, nickname: target.nickname, avatar: String(target.nickname).slice(0, 1), roleLabel: roleLabel(target) },
+    messages,
+  }
+}
+
+export function sendDirectMessage(viewer: SessionUser, otherId: number, body: string) {
+  const { conversationId } = ensureDirectConversation(viewer.id, otherId)
+  const result = db.prepare('INSERT INTO direct_messages (conversation_id, sender_id, body) VALUES (?, ?, ?)')
+    .run(conversationId, viewer.id, body.trim())
+  db.prepare('UPDATE direct_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversationId)
+  return db.prepare(`SELECT id, sender_id as senderId, body, ${ISO('created_at')} as createdAt, read_at as readAt FROM direct_messages WHERE id = ?`)
+    .get(result.lastInsertRowid)
+}
+
+export function directUnreadCount(viewer: SessionUser) {
+  return (db.prepare(`
+    SELECT COUNT(*) as c FROM direct_messages m JOIN direct_conversations c ON c.id = m.conversation_id
+    WHERE (c.user_low_id = @id OR c.user_high_id = @id) AND m.sender_id != @id AND m.read_at IS NULL
+  `).get({ id: viewer.id }) as { c: number }).c
 }
 
 // ---------- admin ----------

@@ -10,7 +10,7 @@ export const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 4
 const currentVersion = db.pragma('user_version', { simple: true }) as number
 
 if (currentVersion < 2) {
@@ -18,6 +18,51 @@ if (currentVersion < 2) {
 }
 if (currentVersion < 3) {
   db.exec('ALTER TABLE posts ADD COLUMN edited INTEGER NOT NULL DEFAULT 0')
+}
+if (currentVersion < 4) {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN campus TEXT NOT NULL DEFAULT '知行大学';
+    ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'verified';
+    ALTER TABLE posts ADD COLUMN images TEXT NOT NULL DEFAULT '[]';
+
+    CREATE TABLE user_follows (
+      follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (follower_id, following_id),
+      CHECK (follower_id != following_id)
+    );
+    CREATE INDEX idx_user_follows_following ON user_follows(following_id);
+
+    CREATE TABLE direct_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_low_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_high_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (user_low_id, user_high_id),
+      CHECK (user_low_id < user_high_id)
+    );
+    CREATE TABLE direct_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL REFERENCES direct_conversations(id) ON DELETE CASCADE,
+      sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      read_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_direct_messages_conversation ON direct_messages(conversation_id, id);
+
+    CREATE TABLE verification_codes (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `)
 }
 db.pragma(`user_version = ${SCHEMA_VERSION}`)
 

@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 data/*.db*
+data/uploads/
+data/exports/
 .playwright-cli/
 output/
 

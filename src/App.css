@@ -175,3 +175,69 @@ button.need-title-row{border:0;background:transparent;padding:0;width:100%;curso
 .section-heading .admin-search{display:none}
 }
 
+/* ===== v4: following feed / image posts / campus verification / messages ===== */
+html,body,#root{max-width:100%;overflow-x:hidden}
+.main-content,.page-view,.feed-list,.post-card,.post-content{min-width:0;max-width:100%}
+.feed-scope{display:inline-flex;gap:4px;padding:4px;background:#eef1e9;border-radius:10px;margin:-8px 0 14px}
+.feed-scope button{border:0;background:transparent;color:#81877d;border-radius:8px;padding:7px 13px;font-size:11px;font-weight:700;cursor:pointer}
+.feed-scope button.active{background:#fff;color:var(--green-dark);box-shadow:0 2px 8px rgba(43,63,48,.08)}
+.filter-pills{min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none}
+.filter-pills::-webkit-scrollbar{display:none}
+.post-images{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:14px 0 4px;max-width:680px}
+.post-images.count-1{grid-template-columns:minmax(0,520px)}
+.post-images img{display:block;width:100%;height:180px;object-fit:cover;border-radius:10px;background:#edf0e9;border:1px solid #e4e7df}
+.post-images.count-1 img{height:min(330px,42vw)}
+.detail-images{margin-top:18px;max-width:760px}
+.detail-images img{height:260px}
+.image-upload-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.image-upload-row>small{font-size:10px;color:#9da198}
+.image-upload{position:relative;display:inline-flex!important;width:auto!important;flex-direction:row!important;align-items:center;gap:7px;margin:0!important;cursor:pointer}
+.image-upload.disabled{opacity:.5;cursor:not-allowed}
+.image-upload input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none}
+.image-upload>span{font-size:9px;color:#9da198}
+.composer-image-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.composer-image-grid>div{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;background:#eef0e9}
+.composer-image-grid img{width:100%;height:100%;object-fit:cover}
+.composer-image-grid button{position:absolute;right:5px;top:5px;width:27px;height:27px;border:0;border-radius:8px;background:rgba(31,37,31,.72);color:#fff;display:grid;place-items:center;cursor:pointer}
+.profile-hero-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+.ghost-button.engaged{background:#e6efe4;color:var(--green-dark);border-color:#c8d9c5}
+.user-impact .impact-row{grid-template-columns:repeat(5,minmax(0,1fr))}
+.security-row.pending{color:#9a6b25;background:#fff8eb}
+.verification-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;background:#f6f8f2;border:1px solid #e2e7dc;border-radius:10px;padding:12px;margin-top:10px}
+.verification-form label{display:grid;gap:4px;font-size:10px;color:#777d73}
+.verification-form input{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 10px;outline:0;font-size:12px;color:var(--ink);min-width:0}
+.verification-form input:focus{border-color:#a5c1a5;box-shadow:0 0 0 3px #e4efe4}
+.verification-form button{align-self:end;justify-content:center}
+.verification-form .dev-code{grid-column:1/-1;border:1px dashed #d5bd89;background:#fff8e8;color:#89651f;border-radius:8px;padding:8px 10px;font-size:10px;text-align:left;cursor:pointer}
+.messages-header{margin-bottom:18px}
+.messages-layout{height:calc(100vh - 210px);min-height:520px;display:grid;grid-template-columns:300px minmax(0,1fr);border:1px solid var(--line);background:var(--paper);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.conversation-list{border-right:1px solid var(--line);overflow-y:auto;background:#fafbf7}
+.conversation-title{height:58px;display:flex;align-items:center;gap:8px;padding:0 15px;border-bottom:1px solid var(--line);font-size:12px;color:var(--green-dark)}
+.conversation-empty{padding:24px 16px;text-align:center;color:#999e95;font-size:11px;line-height:1.7}
+.conversation-list>button{width:100%;border:0;border-bottom:1px solid #eceee7;background:transparent;padding:12px;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:9px;align-items:center;text-align:left;cursor:pointer;color:var(--ink)}
+.conversation-list>button:hover,.conversation-list>button.active{background:#edf3ea}
+.conversation-list>button>span:nth-child(2){display:grid;gap:4px;min-width:0}
+.conversation-list>button strong{font-size:11px}
+.conversation-list>button small{font-size:9px;color:#969b92;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conversation-meta{display:grid;justify-items:end;gap:5px}
+.conversation-meta b{min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--green);color:#fff;font-size:9px;display:grid;place-items:center}
+.message-thread{min-width:0;display:flex;flex-direction:column;background:#fff}
+.message-placeholder{margin:auto;text-align:center;color:#9ca198;display:grid;justify-items:center;gap:8px;padding:30px}.message-placeholder h3{font-size:15px;color:var(--ink);margin:0}.message-placeholder p{font-size:11px;margin:0}
+.thread-head{height:58px;flex:0 0 auto;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px;padding:0 15px}.thread-head>div{display:grid;gap:2px}.thread-head strong{font-size:12px}.thread-head small{font-size:9px;color:#959a91}.thread-back{display:none}
+.message-list{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:9px;background:linear-gradient(180deg,#fbfcf8,#f7f9f4)}
+.message-bubble{align-self:flex-start;max-width:min(76%,560px);display:grid;gap:4px}.message-bubble.mine{align-self:flex-end;justify-items:end}.message-bubble p{margin:0;background:#fff;border:1px solid var(--line);border-radius:4px 13px 13px 13px;padding:9px 11px;font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}.message-bubble.mine p{background:#dfeede;border-color:#c9dfc7;border-radius:13px 4px 13px 13px}.message-bubble small{font-size:8px;color:#a6aaa2}
+.message-composer{flex:0 0 auto;border-top:1px solid var(--line);padding:10px;display:flex;gap:8px;align-items:flex-end}.message-composer textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:9px;background:#fbfcf8;padding:9px 10px;outline:0;font:12px/1.5 inherit;min-width:0}.message-composer textarea:focus{border-color:#a5c1a5;box-shadow:0 0 0 3px #e4efe4}.message-composer .primary-button{flex:0 0 auto}
+
+@media (max-width:760px){
+  .main-content{width:100%;min-width:0;overflow:hidden}
+  .section-heading{gap:10px;min-width:0}.section-heading>div{min-width:0}.section-heading .primary-button{flex:0 0 auto;padding:9px 11px;white-space:nowrap}
+  .feed-toolbar{min-width:0;max-width:100%;overflow:hidden}.filter-pills{display:flex;flex-wrap:nowrap;width:100%;padding-bottom:4px}.filter-pills button{flex:0 0 auto}
+  .sort-select{max-width:100%;overflow-x:auto;white-space:nowrap;padding-bottom:3px}
+  .post-card{overflow:hidden}.post-meta,.post-actions{min-width:0}.post-actions{justify-content:space-between}.post-actions button{flex:0 1 auto;min-width:0;padding-left:2px;padding-right:2px}
+  .post-images img{height:120px}.post-images.count-1 img{height:210px}.detail-images img{height:160px}
+  .composer-image-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.image-upload-row{align-items:flex-start;flex-direction:column}
+  .user-impact .impact-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.user-impact .impact-row>div{border-left:0!important;padding-left:0!important}
+  .verification-form{grid-template-columns:1fr}.verification-form .dev-code{grid-column:1}
+  .messages-page{padding:0}.messages-header{padding:0 2px}.messages-layout{height:calc(100dvh - 146px);min-height:470px;display:block;border-radius:12px}.conversation-list{height:100%;border-right:0}.conversation-list.has-thread{display:none}.message-thread{height:100%;display:none}.message-thread.open{display:flex}.thread-back{display:grid}
+  .message-list{padding:14px}.message-bubble{max-width:86%}.message-composer{padding:8px}.message-composer .primary-button{padding:10px}.message-composer .primary-button{font-size:0}.message-composer .primary-button svg{margin:0}
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Bookmark, CheckCircle2, ChevronRight, Eye, Heart, KeyRound, LockKeyhole, LogOut,
-  MessageCircle, PenLine, ShieldCheck, Trash2, UserRound, X,
+  Mail, MessageCircle, PenLine, ShieldCheck, Trash2, UserRound, X,
 } from 'lucide-react'
 import { api } from '../api'
 import { timeAgo } from '../format'
@@ -32,6 +32,10 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
   const [newPassword, setNewPassword] = useState('')
   const [newPassword2, setNewPassword2] = useState('')
   const [pwBusy, setPwBusy] = useState(false)
+  const [verifyEmail, setVerifyEmail] = useState(user?.email ?? '')
+  const [verifyCode, setVerifyCode] = useState('')
+  const [devCode, setDevCode] = useState('')
+  const [verifyBusy, setVerifyBusy] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -100,6 +104,37 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
     }
   }
 
+  const requestVerification = async () => {
+    if (!verifyEmail.trim() || verifyBusy) return
+    setVerifyBusy(true)
+    try {
+      const payload = await api<{ data: { email: string; devCode?: string } }>('/api/verification/request', { method: 'POST', body: { email: verifyEmail } })
+      setVerifyEmail(payload.data.email)
+      setDevCode(payload.data.devCode ?? '')
+      notify(payload.data.devCode ? '演示验证码已生成，可直接填写' : '验证码已发送到校园邮箱')
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '验证码发送失败')
+    } finally {
+      setVerifyBusy(false)
+    }
+  }
+
+  const confirmVerification = async () => {
+    if (!/^\d{6}$/.test(verifyCode) || verifyBusy) return
+    setVerifyBusy(true)
+    try {
+      const payload = await api<{ data: { verified: boolean; email: string; campus: string } }>('/api/verification/confirm', { method: 'POST', body: { code: verifyCode } })
+      onUserUpdated({ ...user, verified: true, verificationStatus: 'verified', email: payload.data.email, campus: payload.data.campus })
+      setVerifyCode('')
+      setDevCode('')
+      notify('校园身份验证完成，社区互动权限已开启')
+    } catch (err) {
+      notify(err instanceof Error ? err.message : '验证失败')
+    } finally {
+      setVerifyBusy(false)
+    }
+  }
+
   const deletePost = async (post: Post) => {
     if (!window.confirm(`确定删除《${post.title}》吗？`)) return
     try {
@@ -161,7 +196,11 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
           <div className="panel-heading"><span className="section-kicker">IDENTITY &amp; SAFETY</span><LockKeyhole size={17} /></div>
           <h2>身份与安全</h2>
           <p>你的真实身份只用于社区安全验证，前台展示昵称。匿名内容的实名信息仅审核人员可见。</p>
-          <div className="security-row"><CheckCircle2 size={16} /><span>校园身份已验证</span><small>{user.username}</small></div>
+          <div className={`security-row ${user.verified ? '' : 'pending'}`}>
+            {user.verified ? <CheckCircle2 size={16} /> : <Mail size={16} />}
+            <span>{user.verified ? '校园身份已验证' : '校园身份待验证'}</span>
+            <small>{user.verified ? (user.email || user.username) : '验证后可发帖、评论与私信'}</small>
+          </div>
           <div className="security-row"><CheckCircle2 size={16} /><span>账号角色</span><small>{user.roleLabel}</small></div>
           <div className="security-row"><CheckCircle2 size={16} /><span>发言与回复权限</span><small>实名制 · 已开启</small></div>
           <div className="security-row password-row">
@@ -169,6 +208,15 @@ export default function ProfileView({ user, stats, notify, requireAuth, navigate
             <span>登录密码</span>
             <button className="link-button" onClick={() => setPwOpen((value) => !value)}>{pwOpen ? '收起' : '修改密码'}</button>
           </div>
+          {!user.verified && (
+            <div className="verification-form">
+              <label>校园邮箱<input type="email" value={verifyEmail} onChange={(event) => setVerifyEmail(event.target.value)} placeholder="学号@学校邮箱域名" /></label>
+              <button className="ghost-button" disabled={verifyBusy || !verifyEmail.trim()} onClick={requestVerification}>{verifyBusy ? '发送中…' : '获取验证码'}</button>
+              <label>验证码<input inputMode="numeric" value={verifyCode} maxLength={6} onChange={(event) => setVerifyCode(event.target.value.replace(/\D/g, ''))} placeholder="6 位验证码" /></label>
+              <button className="primary-button" disabled={verifyBusy || !/^\d{6}$/.test(verifyCode)} onClick={confirmVerification}>完成验证</button>
+              {devCode && <button className="dev-code" onClick={() => setVerifyCode(devCode)}>演示环境验证码：<strong>{devCode}</strong>（点击填入）</button>}
+            </div>
+          )}
           {pwOpen && (
             <div className="pw-form">
               <input type="password" value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} placeholder="原密码" autoComplete="current-password" />

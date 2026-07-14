@@ -15,6 +15,9 @@ export type SessionUser = {
   grade: string
   bio: string
   verified: boolean
+  campus: string
+  email: string
+  verificationStatus: 'unverified' | 'pending' | 'verified'
   createdAt: string
 }
 
@@ -33,7 +36,8 @@ export function destroySession(token: string) {
 export function userFromToken(token: string | undefined): SessionUser | null {
   if (!token) return null
   const row = db.prepare(`
-    SELECT u.id, u.username, u.nickname, u.role, u.dept, u.grade, u.bio, u.verified, u.created_at as createdAt
+    SELECT u.id, u.username, u.nickname, u.role, u.dept, u.grade, u.bio, u.verified,
+      u.campus, u.email, u.verification_status as verificationStatus, u.created_at as createdAt
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token = ? AND s.expires_at > datetime('now') AND u.status = 'active'
   `).get(token) as (Omit<SessionUser, 'verified'> & { verified: number }) | undefined
@@ -58,6 +62,12 @@ export function attachUser(req: Request, _res: Response, next: NextFunction) {
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.user) return res.status(401).json({ error: '请先登录' })
+  next()
+}
+
+export function requireVerified(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) return res.status(401).json({ error: '请先登录' })
+  if (!req.user.verified) return res.status(403).json({ error: '完成校园邮箱验证后即可参与社区互动' })
   next()
 }
 

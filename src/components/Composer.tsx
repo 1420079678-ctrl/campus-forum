@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { PenLine, ShieldCheck, X } from 'lucide-react'
+import { ImagePlus, PenLine, ShieldCheck, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import type { Board, ModerationResult, Post } from '../types'
 
@@ -15,15 +15,48 @@ export default function Composer({ boards, editPost, onClose, onPublished }: {
   const [title, setTitle] = useState(editPost?.title ?? '')
   const [body, setBody] = useState(editPost?.body ?? '')
   const [tagsInput, setTagsInput] = useState(editPost?.tags.join(' ') ?? '')
+  const [images, setImages] = useState<string[]>(editPost?.images ?? [])
   const [anonymous, setAnonymous] = useState(editPost?.author.anonymous ?? false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   const tags = useMemo(() => Array.from(new Set(
     tagsInput.split(/[,，#\s]+/).map((tag) => tag.trim()).filter(Boolean),
   )).slice(0, 4), [tagsInput])
 
-  const canPublish = title.trim().length >= 5 && body.trim().length >= 10 && !busy
+  const canPublish = title.trim().length >= 5 && body.trim().length >= 10 && !busy && !uploading
+
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files?.length) return
+    const selected = Array.from(files).slice(0, 4 - images.length)
+    if (selected.length === 0) {
+      setError('每篇帖子最多上传 4 张图片')
+      return
+    }
+    setUploading(true)
+    setError('')
+    try {
+      const urls: string[] = []
+      for (const file of selected) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('只支持 JPG、PNG、WebP 图片')
+        if (file.size > 3 * 1024 * 1024) throw new Error('单张图片不能超过 3MB')
+        const data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('图片读取失败'))
+          reader.onerror = () => reject(new Error('图片读取失败'))
+          reader.readAsDataURL(file)
+        })
+        const payload = await api<{ data: { url: string } }>('/api/uploads', { method: 'POST', body: { type: file.type, data } })
+        urls.push(payload.data.url)
+      }
+      setImages((items) => [...items, ...urls].slice(0, 4))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '图片上传失败')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const publish = async () => {
     if (!canPublish) return
@@ -31,8 +64,8 @@ export default function Composer({ boards, editPost, onClose, onPublished }: {
     setError('')
     try {
       const payload = editPost
-        ? await api<PublishPayload>(`/api/posts/${editPost.id}`, { method: 'PATCH', body: { board, title, body, tags, anonymous } })
-        : await api<PublishPayload>('/api/posts', { method: 'POST', body: { board, title, body, tags, anonymous } })
+        ? await api<PublishPayload>(`/api/posts/${editPost.id}`, { method: 'PATCH', body: { board, title, body, tags, images, anonymous } })
+        : await api<PublishPayload>('/api/posts', { method: 'POST', body: { board, title, body, tags, images, anonymous } })
       onPublished(payload.post, payload.moderation)
     } catch (err) {
       setError(err instanceof Error ? err.message : '发布失败，请稍后再试')
@@ -65,6 +98,26 @@ export default function Composer({ boards, editPost, onClose, onPublished }: {
           <input value={tagsInput} onChange={(event) => setTagsInput(event.target.value)} placeholder="如：期末复习 数据库" />
         </label>
         {tags.length > 0 && <div className="tag-row composer-tags">{tags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}
+        <div className="image-upload-row">
+          <label className={`ghost-button image-upload ${images.length >= 4 || uploading ? 'disabled' : ''}`}>
+            <ImagePlus size={16} />{uploading ? '上传中…' : '添加图片'}<span>{images.length}/4</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              disabled={images.length >= 4 || uploading}
+              onChange={(event) => { void uploadFiles(event.currentTarget.files); event.currentTarget.value = '' }}
+            />
+          </label>
+          <small>支持 JPG / PNG / WebP，单张不超过 3MB</small>
+        </div>
+        {images.length > 0 && (
+          <div className="composer-image-grid">
+            {images.map((src, index) => (
+              <div key={src}><img src={src} alt={`帖子配图 ${index + 1}`} /><button type="button" aria-label="移除图片" onClick={() => setImages((items) => items.filter((item) => item !== src))}><Trash2 size={14} /></button></div>
+            ))}
+          </div>
+        )}
         <label className="toggle-row">
           <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} />
           <span className="toggle-track"><span className="toggle-thumb" /></span>

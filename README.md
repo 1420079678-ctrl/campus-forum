@@ -1,6 +1,6 @@
 # 知行里 Campus Commons
 
-面向大学生、教师与学校职能部门的实名校园社区。学生实名注册、前台可匿名发言；讨论、诉求、审核三条产品线闭环：**校园讨论 → 学生诉求 → AI 初审 → 人工复核 → 经验沉淀**。
+面向大学生、教师与学校职能部门的实名校园社区。学生通过校园邮箱验证、前台可匿名发言；讨论、关注、私信、诉求与治理形成闭环：**校园讨论 → 同学连接 → 学生诉求 → AI 初审 → 人工复核 → 经验沉淀**。
 
 技术栈：React 19 + Vite（前端） / Express 5 + better-sqlite3（后端） / 单文件 SQLite 持久化，一条命令即可跑起来，无需外部数据库。
 
@@ -8,9 +8,11 @@
 
 **社区讨论**
 - 板块浏览、标签、关键词搜索（`Ctrl/⌘ + K`）、推荐/最新/热门排序、分页加载
-- 发帖、编辑自己的帖子（编辑后重过 AI 审核并显示"已编辑"）、删除、匿名发布
+- 校园广场与“我的关注”双信息流，关注感兴趣的同学
+- 图文发帖（最多 4 张）、编辑自己的帖子（编辑后重过 AI 审核并显示"已编辑"）、删除、匿名发布
 - 评论、楼中楼回复、匿名评论、点赞、收藏
 - 点击作者头像/昵称进入其公开主页（匿名内容不暴露身份）
+- 站内私信，避免在公开内容中暴露微信、手机号等个人信息
 
 **诉求墙（学生 → 职能部门）**
 - 向后勤/教务/图书馆等部门提交诉求，可匿名
@@ -19,12 +21,14 @@
 
 **内容安全**
 - 规则式 AI 初审：诈骗话术、代写代考、刷单、引流、隐私泄露等 11 类风险
+- 可选 OpenAI-compatible 真实 LLM 复核；模型不可用时自动降级到本地规则
 - 低风险自动放行；中风险发布并转人工复核；高风险帖进入待复核队列（仅作者可见）
 - 举报流程、审核台（通过/隐藏/驳回）、完整审计日志
 - 审核人员可将优质帖"设为精选"，在推荐流置顶展示
 
 **账号与治理**
 - 五种角色：学生 / 教师 / 职能部门 / 审核员 / 管理员
+- 新注册用户通过校园邮箱验证码完成身份验证；验证后开放发帖、评论、图片和私信
 - 站内通知（评论、点赞、审核结果、诉求进展）
 - 个人空间：资料编辑、修改密码（改密后其他设备强制下线）、我的帖子/收藏
 - 管理后台（仅管理员）：成员搜索、角色调整、封禁/解封（封禁立即踢下线）、板块新建与编辑
@@ -56,6 +60,13 @@ npm start              # API + 前端静态文件都由 8787 端口提供
 | `API_PORT` | `8787` | 服务端口 |
 | `HOST` | `127.0.0.1` | 监听地址；给别人访问时设为 `0.0.0.0` |
 | `CAMPUS_FORUM_DB` | `./data/campus-forum.db` | SQLite 数据库文件路径 |
+| `CAMPUS_FORUM_UPLOADS` | `./data/uploads` | 帖子图片目录 |
+| `CAMPUS_NAME` | `知行大学` | 前台显示的学校名称 |
+| `CAMPUS_EMAIL_DOMAINS` | `edu.cn` | 允许验证的学校邮箱域名，逗号分隔；生产环境应填写精确域名 |
+| `VERIFICATION_WEBHOOK_URL` | 空 | 邮件/短信服务 webhook；开发环境未配置时会返回演示验证码 |
+| `CORS_ALLOWED_ORIGINS` | 空 | 允许的额外跨域来源；同源请求自动允许 |
+| `LLM_MODERATION_URL` | 空 | OpenAI-compatible chat-completions 完整地址 |
+| `LLM_API_KEY` / `LLM_MODEL` | 空 / `gpt-4.1-mini` | 真实模型审核配置 |
 
 ## 演示账号
 
@@ -69,7 +80,7 @@ npm start              # API + 前端静态文件都由 8787 端口提供
 | `teacher_li` | `demo123456` | 教师 | 教师身份发言 |
 | `demo` / `linlin` / `xiaoman` 等 | `demo123456` | 学生 | 日常发帖互动 |
 
-> **正式启用前务必**：用 admin 登录 → 个人空间 → 修改密码；并在管理后台处理演示账号（改密或封禁）。
+> **正式启用前务必**：用 admin 登录 → 个人空间 → 修改密码；并在管理后台处理演示账号（改密或封禁）。生产模式默认会检测常见演示密码并拒绝启动，除非显式设置 `ALLOW_DEMO_CREDENTIALS=true`。
 
 ## 怎么给别人用
 
@@ -114,7 +125,7 @@ pm2 save && pm2 startup          # 开机自启
 docker compose up -d --build
 ```
 
-即在 8787 端口运行，数据库持久化在宿主机 `./data/` 目录。国内拉不动基础镜像时，把 Dockerfile 里的 `node:22-bookworm-slim` 换成镜像站地址（如 `docker.m.daocloud.io/library/node:22-bookworm-slim`）。
+即在 8787 端口运行，数据库和上传图片持久化在宿主机 `./data/` 目录。Compose 的默认 `ALLOW_DEMO_CREDENTIALS=true` 只用于快速演示；正式启用时先改密/封禁演示账号，再设为 `false`。国内拉不动基础镜像时，把 Dockerfile 里的 `node:22-bookworm-slim` 换成可信镜像站地址。
 
 ### 方案四：内网穿透（临时给校外朋友演示）
 
@@ -131,7 +142,8 @@ docker compose up -d --build
 ```bash
 npm run build     # 类型检查 + 前端构建
 npm run lint      # oxlint
-python output/smoke.py   # API 冒烟测试（需服务运行中）
+npm run test      # 规则审核 + 隔离数据库 API 集成测试
+npm run check     # lint + test + build，一次完成 CI 同款检查
 ```
 
 ## 目录结构
@@ -141,6 +153,8 @@ server/          Express API（index.ts 路由 / store.ts 业务 / db.ts 建库�
 src/             React 前端（views/ 五个页面 + components/ 弹窗组件）
 data/            SQLite 数据库（运行时生成，勿提交）
 dist/            前端构建产物（npm run build 生成）
+tests/           规则与 API 集成测试
+docs/            PostgreSQL 迁移与社区规模路线
 ```
 
 ## 角色权限速查
@@ -154,6 +168,6 @@ dist/            前端构建产物（npm run build 生成）
 | 设为精选 | | | | ✓ | ✓ |
 | 管理后台（角色/封禁/板块） | | | | | ✓ |
 
-## 后续路线
+## 规模化路线
 
-图片上传、私信、邮箱验证注册、PostgreSQL 迁移、接入真实 LLM 审核（当前为规则引擎，接口已按可替换设计）。AI 只做风险判断与建议，删除与封禁永远保留人工决定。
+图片、私信、校园邮箱验证和真实 LLM 审核接口已经落地。单校内测仍推荐 SQLite；多实例和多校扩展前，按 [PostgreSQL 迁移路径](docs/postgresql-migration.md) 拆分异步数据层并引入 PostgreSQL、Redis、对象存储和全文检索。更完整的产品与规模阶段见 [大学生垂直社区路线](docs/community-scale-roadmap.md)。AI 只做风险判断与建议，删除与封禁始终保留人工决定。
